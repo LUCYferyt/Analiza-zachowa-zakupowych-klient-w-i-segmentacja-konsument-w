@@ -1,0 +1,4 @@
+hipoteza,typ,target,test_R2,test_RMSE,CV_mean_R2,najwazniejszy_predyktor,test_accuracy,f1,CV_mean_accuracy
+hipoteza_1,regresja,NumWebPurchases,0.5161069576083226,1.763123805573277,0.502097649523235,Income,,,
+hipoteza_2,regresja,MntWines,0.5714810264045432,226.69254719688286,0.5671754434834446,Income,,,
+hipoteza_3,klasyfikacja,Response,,,,Income,0.8375451263537906,0.18181818181818182,0.8492790759156448

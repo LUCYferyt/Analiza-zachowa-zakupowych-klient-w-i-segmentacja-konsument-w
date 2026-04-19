@@ -1,0 +1,30 @@
+Reguła 1
+Warunki: (Income <= 82275.000) and (Recency > 20.500) and (NumCatalogPurchases <= 9.500) and (NumCatalogPurchases <= 0.500)
+Przewidywana klasa: 0
+Pewność: 0.9730
+Wsparcie: 333
+
+Reguła 2
+Warunki: (Income <= 82275.000) and (Recency <= 20.500) and (NumCatalogPurchases <= 0.500) and (Income > 27248.500)
+Przewidywana klasa: 0
+Pewność: 0.9661
+Wsparcie: 59
+
+Reguła 3
+Warunki: (Income <= 82275.000) and (Recency > 20.500) and (NumCatalogPurchases <= 9.500) and (NumCatalogPurchases > 0.500)
+Przewidywana klasa: 0
+Pewność: 0.9003
+Wsparcie: 863
+
+Reguła 4
+Warunki: (Income <= 82275.000) and (Recency <= 20.500) and (NumCatalogPurchases <= 0.500) and (Income <= 27248.500)
+Przewidywana klasa: 0
+Pewność: 0.8000
+Wsparcie: 30
+
+Reguła 5
+Warunki: (Income > 82275.000) and (NumCatalogPurchases <= 7.500) and (Recency > 23.500) and (Recency <= 66.500)
+Przewidywana klasa: 0
+Pewność: 0.7429
+Wsparcie: 35
+

@@ -1,0 +1,12 @@
+warunki,przewidywana_klasa,pewnosc,wsparcie
+(Income <= 82275.000) and (Recency <= 20.500) and (NumCatalogPurchases <= 0.500) and (Income <= 27248.500),0,0.8,30
+(Income <= 82275.000) and (Recency <= 20.500) and (NumCatalogPurchases <= 0.500) and (Income > 27248.500),0,0.9661016949152542,59
+(Income <= 82275.000) and (Recency <= 20.500) and (NumCatalogPurchases > 0.500) and (Income <= 38535.000),1,0.5348837209302325,43
+(Income <= 82275.000) and (Recency <= 20.500) and (NumCatalogPurchases > 0.500) and (Income > 38535.000),0,0.696969696969697,198
+(Income <= 82275.000) and (Recency > 20.500) and (NumCatalogPurchases <= 9.500) and (NumCatalogPurchases <= 0.500),0,0.972972972972973,333
+(Income <= 82275.000) and (Recency > 20.500) and (NumCatalogPurchases <= 9.500) and (NumCatalogPurchases > 0.500),0,0.9003476245654692,863
+(Income <= 82275.000) and (Recency > 20.500) and (NumCatalogPurchases > 9.500),0,0.6363636363636364,22
+(Income > 82275.000) and (NumCatalogPurchases <= 7.500) and (Recency <= 23.500),1,0.65,20
+(Income > 82275.000) and (NumCatalogPurchases <= 7.500) and (Recency > 23.500) and (Recency <= 66.500),0,0.7428571428571429,35
+(Income > 82275.000) and (NumCatalogPurchases <= 7.500) and (Recency > 23.500) and (Recency > 66.500),1,0.53125,32
+(Income > 82275.000) and (NumCatalogPurchases > 7.500),1,0.6296296296296297,27

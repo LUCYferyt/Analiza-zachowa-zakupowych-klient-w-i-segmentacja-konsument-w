@@ -1,0 +1,17 @@
+warunki,przewidywana_wartosc,wariancja_w_lisciu,wsparcie
+(Income <= 47902.500) and (Income <= 39550.000) and (NumWebVisitsMonth <= 7.500) and (Income <= 14468.000),3.95,45.6475,20
+(Income <= 47902.500) and (Income <= 39550.000) and (NumWebVisitsMonth <= 7.500) and (Income > 14468.000),1.728538283062645,0.9634315060750107,431
+(Income <= 47902.500) and (Income <= 39550.000) and (NumWebVisitsMonth > 7.500) and (Income <= 32056.500),2.184357541899441,2.150369838644238,179
+(Income <= 47902.500) and (Income <= 39550.000) and (NumWebVisitsMonth > 7.500) and (Income > 32056.500),3.4705882352941178,4.90795847750865,85
+(Income <= 47902.500) and (Income > 39550.000) and (NumWebVisitsMonth <= 7.500) and (NumWebVisitsMonth <= 4.500),1.7179487179487178,0.9717291255752798,39
+(Income <= 47902.500) and (Income > 39550.000) and (NumWebVisitsMonth <= 7.500) and (NumWebVisitsMonth > 4.500),3.125748502994012,3.319516655312132,167
+(Income <= 47902.500) and (Income > 39550.000) and (NumWebVisitsMonth > 7.500) and (Recency <= 30.500),3.8636363636363638,3.8450413223140494,22
+(Income <= 47902.500) and (Income > 39550.000) and (NumWebVisitsMonth > 7.500) and (Recency > 30.500),5.60377358490566,6.239231043075829,53
+(Income > 47902.500) and (NumWebVisitsMonth <= 3.500) and (NumWebVisitsMonth <= 1.500) and (Recency <= 12.500),4.75,27.387500000000003,20
+(Income > 47902.500) and (NumWebVisitsMonth <= 3.500) and (NumWebVisitsMonth <= 1.500) and (Recency > 12.500),3.0291970802919708,1.2546219830571683,137
+(Income > 47902.500) and (NumWebVisitsMonth <= 3.500) and (NumWebVisitsMonth > 1.500) and (Income <= 65547.500),3.2527472527472527,1.573481463591353,91
+(Income > 47902.500) and (NumWebVisitsMonth <= 3.500) and (NumWebVisitsMonth > 1.500) and (Income > 65547.500),5.166666666666667,1.595410628019323,276
+(Income > 47902.500) and (NumWebVisitsMonth > 3.500) and (Income <= 55418.000) and (NumWebVisitsMonth <= 6.500),4.0701754385964914,4.188057863958139,114
+(Income > 47902.500) and (NumWebVisitsMonth > 3.500) and (Income <= 55418.000) and (NumWebVisitsMonth > 6.500),6.208333333333333,6.5190972222222285,96
+(Income > 47902.500) and (NumWebVisitsMonth > 3.500) and (Income > 55418.000) and (NumWebVisitsMonth <= 4.500),6.044444444444444,4.427654320987656,135
+(Income > 47902.500) and (NumWebVisitsMonth > 3.500) and (Income > 55418.000) and (NumWebVisitsMonth > 4.500),7.01994301994302,6.862850139203417,351

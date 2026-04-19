@@ -1,0 +1,30 @@
+Reguła 1
+Warunki: (Income <= 54919.500) and (Income <= 42555.500) and (Income <= 36091.500) and (Income <= 28766.500)
+Przewidywana wartość: 12.5231
+Wariancja w liściu: 308.9951
+Wsparcie: 346
+
+Reguła 2
+Warunki: (Income <= 54919.500) and (Income <= 42555.500) and (Income <= 36091.500) and (Income > 28766.500)
+Przewidywana wartość: 36.7458
+Wariancja w liściu: 2228.3812
+Wsparcie: 240
+
+Reguła 3
+Warunki: (Income <= 54919.500) and (Income <= 42555.500) and (Income > 36091.500) and (Kidhome > 0.500)
+Przewidywana wartość: 57.3556
+Wariancja w liściu: 4294.5180
+Wsparcie: 180
+
+Reguła 4
+Warunki: (Income <= 54919.500) and (Income <= 42555.500) and (Income > 36091.500) and (Kidhome <= 0.500)
+Przewidywana wartość: 121.1429
+Wariancja w liściu: 8643.9439
+Wsparcie: 56
+
+Reguła 5
+Warunki: (Income <= 54919.500) and (Income > 42555.500) and (Kidhome > 0.500) and (Income <= 49007.000)
+Przewidywana wartość: 91.0000
+Wariancja w liściu: 10220.0556
+Wsparcie: 108
+

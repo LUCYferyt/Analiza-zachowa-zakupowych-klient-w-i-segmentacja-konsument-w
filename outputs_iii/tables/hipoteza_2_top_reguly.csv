@@ -1,0 +1,6 @@
+warunki,przewidywana_wartosc,wariancja_w_lisciu,wsparcie
+(Income <= 54919.500) and (Income <= 42555.500) and (Income <= 36091.500) and (Income <= 28766.500),12.523121387283236,308.9951301413345,346
+(Income <= 54919.500) and (Income <= 42555.500) and (Income <= 36091.500) and (Income > 28766.500),36.74583333333333,2228.381232638889,240
+(Income <= 54919.500) and (Income <= 42555.500) and (Income > 36091.500) and (Kidhome > 0.500),57.355555555555554,4294.518024691359,180
+(Income <= 54919.500) and (Income <= 42555.500) and (Income > 36091.500) and (Kidhome <= 0.500),121.14285714285714,8643.94387755102,56
+(Income <= 54919.500) and (Income > 42555.500) and (Kidhome > 0.500) and (Income <= 49007.000),91.0,10220.055555555555,108

@@ -1,0 +1,4 @@
+hipoteza,typ,target,R2,koszt_resubstytucji_MSE,SK_srednie_R2,accuracy,blad_calkowity
+hipoteza_1,regresja,NumWebPurchases,0.4861553397764642,3.858676688966446,0.4453103269358719,,
+hipoteza_2,regresja,MntWines,0.5832329795015448,47402.57093683934,0.5577231322318242,,
+hipoteza_3,klasyfikacja,Response,,,,0.8303249097472925,0.16967509025270755

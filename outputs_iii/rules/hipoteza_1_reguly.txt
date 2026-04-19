@@ -1,0 +1,30 @@
+Reguła 1
+Warunki: (Income <= 47902.500) and (Income <= 39550.000) and (NumWebVisitsMonth <= 7.500) and (Income > 14468.000)
+Przewidywana wartość: 1.7285
+Wariancja w liściu: 0.9634
+Wsparcie: 431
+
+Reguła 2
+Warunki: (Income <= 47902.500) and (Income > 39550.000) and (NumWebVisitsMonth <= 7.500) and (NumWebVisitsMonth <= 4.500)
+Przewidywana wartość: 1.7179
+Wariancja w liściu: 0.9717
+Wsparcie: 39
+
+Reguła 3
+Warunki: (Income > 47902.500) and (NumWebVisitsMonth <= 3.500) and (NumWebVisitsMonth <= 1.500) and (Recency > 12.500)
+Przewidywana wartość: 3.0292
+Wariancja w liściu: 1.2546
+Wsparcie: 137
+
+Reguła 4
+Warunki: (Income > 47902.500) and (NumWebVisitsMonth <= 3.500) and (NumWebVisitsMonth > 1.500) and (Income <= 65547.500)
+Przewidywana wartość: 3.2527
+Wariancja w liściu: 1.5735
+Wsparcie: 91
+
+Reguła 5
+Warunki: (Income > 47902.500) and (NumWebVisitsMonth <= 3.500) and (NumWebVisitsMonth > 1.500) and (Income > 65547.500)
+Przewidywana wartość: 5.1667
+Wariancja w liściu: 1.5954
+Wsparcie: 276
+
