@@ -8,11 +8,6 @@ import seaborn as sns
 
 from scipy.stats import chi2_contingency, shapiro, zscore
 
-warnings.filterwarnings("ignore")
-
-# =========================
-# KONFIGURACJA
-# =========================
 
 FILE_PATH = "data/marketing_campaign.csv"
 OUTPUT_DIR = "outputs_ii"
@@ -22,7 +17,7 @@ os.makedirs(f"{OUTPUT_DIR}/tables", exist_ok=True)
 os.makedirs(f"{OUTPUT_DIR}/plots", exist_ok=True)
 
 COLOR_PALETTE = [
-    "#675285",  # główny fiolet
+    "#675285",  # fiolet
     "#D16BA5",  # magenta
     "#6C63FF",  # błękitowo-fioletowy
     "#00B4D8",  # błękit
@@ -69,10 +64,7 @@ SCATTER_PAIRS = [
 
 SCATTER_GROUP_VAR = "Marital_Status"
 
-
-# =========================
-# STYL WYKRESÓW
-# =========================
+#styl wykresów
 
 def set_plot_style():
     sns.set_theme(style="whitegrid", context="talk")
@@ -94,10 +86,6 @@ def set_plot_style():
     plt.rcParams["grid.alpha"] = 0.85
     plt.rcParams["axes.grid"] = True
 
-
-# =========================
-# WCZYTANIE I CZYSZCZENIE
-# =========================
 
 def load_data(path: str) -> pd.DataFrame:
     return pd.read_csv(path, sep="\t")
@@ -124,18 +112,17 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
             "Together": "Partner",
             "Married": "Partner",
             "Single": "Single",
+            "Alone": "Single",
             "Divorced": "Single",
             "Widow": "Single",
-            "YOLO": "Other",
-            "Absurd": "Other",
         })
+
+        df = df[~df["Marital_Status"].isin(["YOLO", "Absurd"])]
 
     return df
 
 
-# =========================
-# 1. STATYSTYKI OPISOWE
-# =========================
+#statysttyki opisowe
 
 def descriptive_stats(df: pd.DataFrame, numeric_cols: list[str]) -> pd.DataFrame:
     rows = []
@@ -161,9 +148,7 @@ def descriptive_stats(df: pd.DataFrame, numeric_cols: list[str]) -> pd.DataFrame
     return result
 
 
-# =========================
-# 2. TABELE LICZNOŚCI
-# =========================
+#tab liczebnosci
 
 def frequency_tables(df: pd.DataFrame, categorical_cols: list[str]) -> dict:
     results = {}
@@ -177,20 +162,15 @@ def frequency_tables(df: pd.DataFrame, categorical_cols: list[str]) -> dict:
 
     return results
 
-
-# =========================
-# 3. TABELA WIELODZIELCZA
-# =========================
+#tab krzyzowa
 
 def multivariate_table(df: pd.DataFrame) -> pd.DataFrame:
     table = pd.crosstab(df["Marital_Status"], df["Response"], margins=True)
-    table.to_csv(f"{OUTPUT_DIR}/tables/tabela_wielodzielcza_marital_response.csv")
+    table.to_csv(f"{OUTPUT_DIR}/tables/tabela_krzyzowa_marital_response.csv")
     return table
 
 
-# =========================
-# 4. HISTOGRAMY
-# =========================
+#histogram
 
 def plot_histograms(df: pd.DataFrame, numeric_cols: list[str]):
     for i, col in enumerate(numeric_cols):
@@ -265,9 +245,7 @@ def categorized_histograms(df: pd.DataFrame):
     plt.close()
 
 
-# =========================
-# 5. WYKRESY ŚREDNICH W GRUPACH
-# =========================
+#średnie w grupach
 
 def interaction_plots(df: pd.DataFrame):
     mean_table = df.groupby("Marital_Status", as_index=False)["MntWines"].mean()
@@ -304,9 +282,7 @@ def interaction_plots(df: pd.DataFrame):
     plt.close()
 
 
-# =========================
-# 6. MACIERZ KORELACJI
-# =========================
+#macierz korelacji
 
 def correlation_matrix(df: pd.DataFrame, numeric_cols: list[str]) -> pd.DataFrame:
     corr = df[numeric_cols].corr()
@@ -329,9 +305,7 @@ def correlation_matrix(df: pd.DataFrame, numeric_cols: list[str]) -> pd.DataFram
     return corr
 
 
-# =========================
-# 7. TEST CHI^2 I DIAGRAM WAŻNOŚCI
-# =========================
+#diagram waznosci
 
 def chi_square_tests(df: pd.DataFrame) -> pd.DataFrame:
     results = []
@@ -389,9 +363,7 @@ def chi_square_tests(df: pd.DataFrame) -> pd.DataFrame:
     return result_df
 
 
-# =========================
-# 8. BOXPLOTY
-# =========================
+#boxplot
 
 def boxplots(df: pd.DataFrame, numeric_cols: list[str]):
     for i, col in enumerate(numeric_cols):
@@ -425,9 +397,7 @@ def categorized_boxplots(df: pd.DataFrame, pairs: list[tuple[str, str]]):
         plt.close()
 
 
-# =========================
-# 9. TEST NORMALNOŚCI I ODSTAJĄCE
-# =========================
+#normalne/odstajace
 
 def normality_and_outliers(df: pd.DataFrame, numeric_cols: list[str]) -> pd.DataFrame:
     results = []
@@ -467,9 +437,7 @@ def normality_and_outliers(df: pd.DataFrame, numeric_cols: list[str]) -> pd.Data
     return normality_df.merge(outliers_df, on="zmienna")
 
 
-# =========================
-# 10. WYKRESY ROZRZUTU
-# =========================
+#wykres rozrzutu
 
 def scatter_plots(df: pd.DataFrame, pairs: list[tuple[str, str]], group_var: str):
     for i, (x_col, y_col) in enumerate(pairs):
@@ -507,48 +475,6 @@ def scatter_plots(df: pd.DataFrame, pairs: list[tuple[str, str]], group_var: str
             )
             plt.close()
 
-
-# =========================
-# 11. SZKIC WNIOSKÓW
-# =========================
-
-def write_summary_template():
-    text = """
-SZKIC WNIOSKÓW DO UZUPEŁNIENIA
-
-1. Jakie zmienne są skorelowane ze zmiennymi zależnymi?
-- Sprawdź wartości w macierzy korelacji.
-- Zwróć uwagę na pary:
-  * NumWebPurchases vs Income, Recency, NumWebVisitsMonth
-  * MntWines vs Income, Kidhome
-  * Response vs Income, Recency, NumCatalogPurchases
-
-2. Które zmienne mają najsilniejszy wpływ?
-- Sprawdź najwyższe wartości bezwzględne korelacji.
-- Sprawdź wykres ważności Chi^2.
-
-3. Czy zmienne objaśniające są wzajemnie skorelowane?
-- Oceń korelacje pomiędzy Income, Recency, NumWebVisitsMonth, Kidhome, NumCatalogPurchases, MntWines.
-
-4. Jaka jest postać zależności?
-- Liniowa: gdy scatter pokazuje trend zbliżony do linii.
-- Nieliniowa: gdy rozrzut lub grupowanie wskazuje inną zależność.
-
-5. Czy model może być liniowy?
-- Jeśli zależności są w miarę monotoniczne i korelacje mają sens, można rozważyć model liniowy.
-- Jeśli zależności są nieregularne lub silnie grupowe, model liniowy może być niewystarczający.
-
-6. Jaki jest kierunek zależności?
-- Dodatni: wzrost X powoduje wzrost Y.
-- Ujemny: wzrost X powoduje spadek Y.
-"""
-    with open(f"{OUTPUT_DIR}/tables/szkic_wnioskow.txt", "w", encoding="utf-8") as f:
-        f.write(text.strip())
-
-
-# =========================
-# MAIN
-# =========================
 
 def main():
     set_plot_style()
@@ -591,8 +517,6 @@ def main():
     print(normality_df)
 
     scatter_plots(df, SCATTER_PAIRS, SCATTER_GROUP_VAR)
-
-    write_summary_template()
 
     print(f"\nWyniki zapisano w folderze: {OUTPUT_DIR}")
 

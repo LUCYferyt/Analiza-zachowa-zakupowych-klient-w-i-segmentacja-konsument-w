@@ -24,9 +24,6 @@ from sklearn.preprocessing import LabelEncoder
 
 warnings.filterwarnings("ignore")
 
-# =========================
-# ŚCIEŻKI
-# =========================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILE_PATH = os.path.join(BASE_DIR, "data", "marketing_campaign.csv")
@@ -35,23 +32,21 @@ TABLES_DIR = os.path.join(OUTPUT_DIR, "tables")
 PLOTS_DIR = os.path.join(OUTPUT_DIR, "plots")
 RULES_DIR = os.path.join(OUTPUT_DIR, "rules")
 
-# =========================
-# KOLORY I STYL
-# =========================
 
 COLOR_PALETTE = [
-    "#675285",
-    "#D16BA5",
-    "#6C63FF",
-    "#00B4D8",
-    "#A23E48",
-    "#F4A6C1",
-    "#B8C0FF",
+    "#675285",  # fiolet
+    "#D16BA5",  # magenta
+    "#6C63FF",  # błękitowo-fioletowy
+    "#00B4D8",  # błękit
+    "#A23E48",  # granatowo-bordowy
+    "#F4A6C1",  # jasny róż
+    "#B8C0FF",  # pastelowy niebieski
 ]
 
-PRIMARY_COLOR = COLOR_PALETTE[0]
-SECONDARY_COLOR = COLOR_PALETTE[2]
-ACCENT_COLOR = COLOR_PALETTE[1]
+PRIMARY_COLOR = "#675285"
+SECONDARY_COLOR = "#D16BA5"
+ACCENT_COLOR = "#A23E48"
+LIGHT_COLOR = "#F9EFF5"
 TEXT_COLOR = "#4A3B5F"
 GRID_COLOR = "#E6DFF0"
 EDGE_COLOR = "#D8CBE6"
@@ -78,10 +73,6 @@ HYPOTHESES = {
     },
 }
 
-
-# =========================
-# FUNKCJE OGÓLNE
-# =========================
 
 def create_directories():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -195,9 +186,7 @@ def prepare_dataset(df: pd.DataFrame, target: str, features: list[str]):
     return X, y, encoders, data
 
 
-# =========================
-# WYKRESY I REGUŁY
-# =========================
+#wykresy i reguły
 
 def plot_feature_importance(model, feature_names, title, filename):
     importances = pd.DataFrame({
@@ -314,9 +303,7 @@ def format_rules_txt(rules_df: pd.DataFrame, filename: str, model_type="regressi
     print(f"Zapisano reguły: {filename}")
 
 
-# =========================
-# DRZEWA REGRESYJNE
-# =========================
+#drzewa regresyjne
 
 def run_regression_tree(hypothesis_name, X, y):
     print(f"Budowa drzewa regresyjnego dla {hypothesis_name}...")
@@ -385,9 +372,7 @@ def run_regression_tree(hypothesis_name, X, y):
     return metrics_df
 
 
-# =========================
-# DRZEWO KLASYFIKACYJNE
-# =========================
+#drzewo klasifikacji
 
 def run_classification_tree(hypothesis_name, X, y):
     print(f"Budowa drzewa klasyfikacyjnego dla {hypothesis_name}...")
@@ -476,12 +461,8 @@ def run_classification_tree(hypothesis_name, X, y):
     return metrics_df
 
 
-# =========================
-# MAIN
-# =========================
 
 def main():
-    print("=== START III. Indukcja drzew decyzyjnych ===")
 
     create_directories()
     set_plot_style()

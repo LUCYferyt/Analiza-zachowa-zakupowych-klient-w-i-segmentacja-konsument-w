@@ -16,9 +16,6 @@ from sklearn.preprocessing import LabelEncoder
 
 warnings.filterwarnings("ignore")
 
-# =========================
-# ŚCIEŻKI
-# =========================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILE_PATH = os.path.join(BASE_DIR, "data", "marketing_campaign.csv")
@@ -26,21 +23,21 @@ OUTPUT_DIR = os.path.join(BASE_DIR, "outputs_iv")
 TABLES_DIR = os.path.join(OUTPUT_DIR, "tables")
 PLOTS_DIR = os.path.join(OUTPUT_DIR, "plots")
 
-# =========================
-# STYL
-# =========================
 
 COLOR_PALETTE = [
-    "#675285",
-    "#D16BA5",
-    "#6C63FF",
-    "#00B4D8",
-    "#A23E48",
-    "#F4A6C1",
-    "#B8C0FF",
+    "#675285",  # fiolet
+    "#D16BA5",  # magenta
+    "#6C63FF",  # błękitowo-fioletowy
+    "#00B4D8",  # błękit
+    "#A23E48",  # granatowo-bordowy
+    "#F4A6C1",  # jasny róż
+    "#B8C0FF",  # pastelowy niebieski
 ]
 
-PRIMARY_COLOR = COLOR_PALETTE[0]
+PRIMARY_COLOR = "#675285"
+SECONDARY_COLOR = "#D16BA5"
+ACCENT_COLOR = "#A23E48"
+LIGHT_COLOR = "#F9EFF5"
 TEXT_COLOR = "#4A3B5F"
 GRID_COLOR = "#E6DFF0"
 EDGE_COLOR = "#D8CBE6"
@@ -49,9 +46,7 @@ FIGURE_BACKGROUND = "#FFFDFE"
 
 RANDOM_STATE = 42
 
-# =========================
-# ZMIENNE DO KLASTERYZACJI
-# =========================
+#zmienne DO klasteryzacji
 
 CLUSTER_FEATURES = [
     "Income",
@@ -79,9 +74,6 @@ PROFILE_NUMERICAL = [
 N_CLUSTERS = 3
 
 
-# =========================
-# FUNKCJE OGÓLNE
-# =========================
 
 def create_directories():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -160,9 +152,7 @@ def prepare_clustering_data(df: pd.DataFrame):
     return data, X, X_scaled, scaler
 
 
-# =========================
-# WYBÓR LICZBY KLASTRÓW
-# =========================
+#wybór liczby klastrów
 
 def evaluate_k_range(X_scaled, k_range=range(2, 7)):
     rows = []
@@ -208,9 +198,7 @@ def evaluate_k_range(X_scaled, k_range=range(2, 7)):
     return results
 
 
-# =========================
-# K-MEANS
-# =========================
+#k-means
 
 def kmeans_cross_validation(X_scaled, n_clusters=3, n_splits=10):
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=RANDOM_STATE)
@@ -277,9 +265,8 @@ def run_kmeans(data: pd.DataFrame, X_scaled, n_clusters=3):
     return result, model, metrics_df
 
 
-# =========================
-# EM / GAUSSIAN MIXTURE
-# =========================
+#em/ gaussian mixture
+
 
 def evaluate_em_components(X_scaled, component_range=range(2, 7)):
     rows = []
@@ -347,9 +334,7 @@ def run_em(data: pd.DataFrame, X_scaled, n_components=3):
     return result, model, metrics_df
 
 
-# =========================
-# CHARAKTERYSTYKA KLASTRÓW
-# =========================
+#charakterystyki klastrow
 
 def cluster_profiles(data: pd.DataFrame, cluster_col: str, prefix: str):
     numeric_profile = data.groupby(cluster_col)[PROFILE_NUMERICAL].mean().reset_index()
@@ -368,9 +353,7 @@ def cluster_profiles(data: pd.DataFrame, cluster_col: str, prefix: str):
     return numeric_profile, counts
 
 
-# =========================
-# WIZUALIZACJE KLASTRÓW
-# =========================
+#wizualizacja klastrow
 
 def plot_clusters_pca(X_scaled, labels, filename, title):
     pca = PCA(n_components=2, random_state=RANDOM_STATE)
@@ -416,9 +399,7 @@ def plot_cluster_profiles(numeric_profile: pd.DataFrame, cluster_col: str, filen
     plt.close()
 
 
-# =========================
-# PORÓWNANIE Z HIPOTEZAMI
-# =========================
+
 
 def compare_with_hypotheses(kmeans_profile: pd.DataFrame, em_profile: pd.DataFrame):
     comparison = pd.DataFrame({
@@ -433,12 +414,9 @@ def compare_with_hypotheses(kmeans_profile: pd.DataFrame, em_profile: pd.DataFra
     return comparison
 
 
-# =========================
-# MAIN
-# =========================
+
 
 def main():
-    print("=== START IV. Analiza skupień ===")
 
     create_directories()
     set_plot_style()

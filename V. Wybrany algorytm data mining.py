@@ -23,9 +23,6 @@ from sklearn.metrics import (
 
 warnings.filterwarnings("ignore")
 
-# =========================
-# ŚCIEŻKI
-# =========================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILE_PATH = os.path.join(BASE_DIR, "data", "marketing_campaign.csv")
@@ -33,21 +30,21 @@ OUTPUT_DIR = os.path.join(BASE_DIR, "outputs_v")
 TABLES_DIR = os.path.join(OUTPUT_DIR, "tables")
 PLOTS_DIR = os.path.join(OUTPUT_DIR, "plots")
 
-# =========================
-# STYL
-# =========================
 
 COLOR_PALETTE = [
-    "#675285",
-    "#D16BA5",
-    "#6C63FF",
-    "#00B4D8",
-    "#A23E48",
-    "#F4A6C1",
-    "#B8C0FF",
+    "#675285",  # fiolet
+    "#D16BA5",  # magenta
+    "#6C63FF",  # błękitowo-fioletowy
+    "#00B4D8",  # błękit
+    "#A23E48",  # granatowo-bordowy
+    "#F4A6C1",  # jasny róż
+    "#B8C0FF",  # pastelowy niebieski
 ]
 
-PRIMARY_COLOR = COLOR_PALETTE[0]
+PRIMARY_COLOR = "#675285"
+SECONDARY_COLOR = "#D16BA5"
+ACCENT_COLOR = "#A23E48"
+LIGHT_COLOR = "#F9EFF5"
 TEXT_COLOR = "#4A3B5F"
 GRID_COLOR = "#E6DFF0"
 EDGE_COLOR = "#D8CBE6"
@@ -56,9 +53,6 @@ FIGURE_BACKGROUND = "#FFFDFE"
 
 RANDOM_STATE = 42
 
-# =========================
-# HIPOTEZY
-# =========================
 
 HYPOTHESES = {
     "hipoteza_1": {
@@ -78,9 +72,6 @@ HYPOTHESES = {
     },
 }
 
-# =========================
-# FUNKCJE OGÓLNE
-# =========================
 
 def create_directories():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -195,9 +186,7 @@ def plot_feature_importance(importances_df: pd.DataFrame, title: str, filename: 
     print(f"Zapisano wykres: {filename}")
 
 
-# =========================
-# REGRESJA - RANDOM FOREST
-# =========================
+#refesja - random forest
 
 def run_rf_regression(hypothesis_name, X, y):
     print(f"Trenowanie Random Forest Regressor dla {hypothesis_name}...")
@@ -295,9 +284,7 @@ def run_rf_regression(hypothesis_name, X, y):
     return metrics_df, importances_df
 
 
-# =========================
-# KLASYFIKACJA - RANDOM FOREST
-# =========================
+#klasyfikacja - random forest
 
 def run_rf_classification(hypothesis_name, X, y):
     print(f"Trenowanie Random Forest Classifier dla {hypothesis_name}...")
@@ -393,11 +380,8 @@ def run_rf_classification(hypothesis_name, X, y):
 
 
 # =========================
-# MAIN
-# =========================
 
 def main():
-    print("=== START V. Wybrany algorytm data mining ===")
 
     create_directories()
     set_plot_style()
