@@ -267,6 +267,26 @@ def interaction_plots(df: pd.DataFrame):
     mean_table_2 = df.groupby("Income_group", as_index=False)["NumWebPurchases"].mean()
     mean_table_2.to_csv(f"{OUTPUT_DIR}/tables/srednie_w_grupach_NumWebPurchases_Income_group.csv", index=False)
 
+
+    plt.figure(figsize=(9, 5.5))
+    plt.bar(
+        mean_table_2["Income_group"].astype(str),
+        mean_table_2["NumWebPurchases"],
+        color=PRIMARY_COLOR
+    )
+    plt.title("Średnia liczba zakupów internetowych w grupach dochodu", pad=14)
+    plt.xlabel("Grupa dochodu")
+    plt.ylabel("Średnia NumWebPurchases")
+    plt.xticks(rotation=20)
+    plt.tight_layout()
+    plt.savefig(
+        f"{OUTPUT_DIR}/plots/bar_mean_NumWebPurchases_Income_group.png",
+        dpi=220,
+        bbox_inches="tight"
+    )
+    plt.close()
+
+
     plt.figure(figsize=(9, 5.5))
     sns.pointplot(
         data=df,
