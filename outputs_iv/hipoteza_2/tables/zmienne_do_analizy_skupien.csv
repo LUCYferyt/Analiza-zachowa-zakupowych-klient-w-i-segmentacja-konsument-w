@@ -1,0 +1,5 @@
+zmienna,rola,typ
+MntWines,zmienna zależna,ilościowa
+Income,zmienna objaśniająca,ilościowa
+Kidhome,zmienna objaśniająca,ilościowa
+Marital_Status,zmienna objaśniająca,jakościowa

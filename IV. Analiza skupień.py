@@ -1,4 +1,5 @@
 import os
+import shutil
 import warnings
 
 import numpy as np
@@ -7,12 +8,15 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.metrics import (
+    calinski_harabasz_score,
+    davies_bouldin_score,
+    silhouette_score,
+)
 from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import KFold
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 warnings.filterwarnings("ignore")
 
@@ -20,65 +24,57 @@ warnings.filterwarnings("ignore")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILE_PATH = os.path.join(BASE_DIR, "data", "marketing_campaign.csv")
 OUTPUT_DIR = os.path.join(BASE_DIR, "outputs_iv")
-TABLES_DIR = os.path.join(OUTPUT_DIR, "tables")
-PLOTS_DIR = os.path.join(OUTPUT_DIR, "plots")
 
+RANDOM_STATE = 42
+N_CLUSTERS = 3
+RESET_OUTPUT_DIR = True
 
 COLOR_PALETTE = [
-    "#675285",  # fiolet
-    "#D16BA5",  # magenta
-    "#6C63FF",  # błękitowo-fioletowy
-    "#00B4D8",  # błękit
-    "#A23E48",  # granatowo-bordowy
-    "#F4A6C1",  # jasny róż
-    "#B8C0FF",  # pastelowy niebieski
+    "#675285",
+    "#D16BA5",
+    "#6C63FF",
+    "#00B4D8",
+    "#A23E48",
+    "#F4A6C1",
+    "#B8C0FF",
 ]
 
 PRIMARY_COLOR = "#675285"
 SECONDARY_COLOR = "#D16BA5"
-ACCENT_COLOR = "#A23E48"
-LIGHT_COLOR = "#F9EFF5"
 TEXT_COLOR = "#4A3B5F"
 GRID_COLOR = "#E6DFF0"
 EDGE_COLOR = "#D8CBE6"
 AXIS_BACKGROUND = "#FCF8FD"
 FIGURE_BACKGROUND = "#FFFDFE"
 
-RANDOM_STATE = 42
 
-#zmienne DO klasteryzacji
+HYPOTHESES = {
+    "hipoteza_1": {
+        "target": "NumWebPurchases",
+        "predictors": ["Income", "Recency", "NumWebVisitsMonth"],
+    },
+    "hipoteza_2": {
+        "target": "MntWines",
+        "predictors": ["Income", "Kidhome", "Marital_Status"],
+    },
+    "hipoteza_3": {
+        "target": "Response",
+        "predictors": ["Income", "Recency", "NumCatalogPurchases"],
+    },
+}
 
-CLUSTER_FEATURES = [
-    "Income",
-    "NumWebPurchases",
-    "MntWines",
-    "NumCatalogPurchases",
-    "Recency",
-    "Kidhome",
-]
 
-PROFILE_CATEGORICAL = [
-    "Marital_Status",
-    "Response",
-]
-
-PROFILE_NUMERICAL = [
-    "Income",
-    "NumWebPurchases",
-    "MntWines",
-    "NumCatalogPurchases",
-    "Recency",
-    "Kidhome",
-]
-
-N_CLUSTERS = 3
-
+def reset_output_directory():
+    if RESET_OUTPUT_DIR and os.path.exists(OUTPUT_DIR):
+        shutil.rmtree(OUTPUT_DIR)
 
 
 def create_directories():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    os.makedirs(TABLES_DIR, exist_ok=True)
-    os.makedirs(PLOTS_DIR, exist_ok=True)
+
+    for hypothesis_name in HYPOTHESES:
+        os.makedirs(os.path.join(OUTPUT_DIR, hypothesis_name, "tables"), exist_ok=True)
+        os.makedirs(os.path.join(OUTPUT_DIR, hypothesis_name, "plots"), exist_ok=True)
 
 
 def set_plot_style():
@@ -98,26 +94,25 @@ def set_plot_style():
     plt.rcParams["text.color"] = TEXT_COLOR
 
 
-def save_dataframe(df: pd.DataFrame, filename: str):
-    df.to_csv(filename, index=False)
-    print(f"Zapisano tabelę: {filename}")
+def get_paths(hypothesis_name):
+    hypothesis_dir = os.path.join(OUTPUT_DIR, hypothesis_name)
+    tables_dir = os.path.join(hypothesis_dir, "tables")
+    plots_dir = os.path.join(hypothesis_dir, "plots")
+    return hypothesis_dir, tables_dir, plots_dir
 
 
-def load_data(path: str) -> pd.DataFrame:
-    print(f"Wczytywanie danych z: {path}")
-
-    if not os.path.exists(path):
-        raise FileNotFoundError(
-            f"Nie znaleziono pliku CSV pod ścieżką:\n{path}\n"
-            f"Sprawdź, czy plik marketing_campaign.csv jest w folderze data."
-        )
-
-    df = pd.read_csv(path, sep="\t")
-    print(f"Wczytano dane. Rozmiar: {df.shape}")
-    return df
+def save_dataframe(df, path):
+    df.to_csv(path, index=False)
 
 
-def clean_data(df: pd.DataFrame) -> pd.DataFrame:
+def load_data():
+    if not os.path.exists(FILE_PATH):
+        raise FileNotFoundError(f"Nie znaleziono pliku: {FILE_PATH}")
+
+    return pd.read_csv(FILE_PATH, sep="\t")
+
+
+def clean_data(df):
     df = df.copy()
     df = df.drop_duplicates()
 
@@ -129,94 +124,164 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
             "Together": "Partner",
             "Married": "Partner",
             "Single": "Single",
+            "Alone": "Single",
             "Divorced": "Single",
             "Widow": "Single",
-            "YOLO": "Other",
-            "Absurd": "Other",
         })
+
+        df = df[~df["Marital_Status"].isin(["YOLO", "Absurd"])]
 
     return df
 
 
-def prepare_clustering_data(df: pd.DataFrame):
-    needed_cols = list(set(CLUSTER_FEATURES + PROFILE_CATEGORICAL + PROFILE_NUMERICAL))
-    data = df[needed_cols].copy()
+def get_hypothesis_columns(config):
+    return [config["target"]] + config["predictors"]
+
+
+def split_columns_by_type(df, columns):
+    numeric_columns = []
+    categorical_columns = []
+
+    for column in columns:
+        if pd.api.types.is_numeric_dtype(df[column]):
+            numeric_columns.append(column)
+        else:
+            categorical_columns.append(column)
+
+    return numeric_columns, categorical_columns
+
+
+def create_encoder():
+    try:
+        return OneHotEncoder(handle_unknown="ignore", sparse_output=False)
+    except TypeError:
+        return OneHotEncoder(handle_unknown="ignore", sparse=False)
+
+
+def prepare_data_for_clustering(df, config):
+    columns = get_hypothesis_columns(config)
+    missing_columns = [column for column in columns if column not in df.columns]
+
+    if missing_columns:
+        raise ValueError(f"Brak kolumn w danych: {missing_columns}")
+
+    data = df[columns].copy()
     data = data.dropna()
 
-    X = data[CLUSTER_FEATURES].copy()
+    numeric_columns, categorical_columns = split_columns_by_type(data, columns)
 
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    numeric_array = scaler.fit_transform(data[numeric_columns]) if numeric_columns else np.empty((len(data), 0))
 
-    print(f"Dane do klasteryzacji: {X.shape}")
-    return data, X, X_scaled, scaler
+    if categorical_columns:
+        encoder = create_encoder()
+        categorical_array = encoder.fit_transform(data[categorical_columns])
+
+        try:
+            categorical_names = encoder.get_feature_names_out(categorical_columns).tolist()
+        except AttributeError:
+            categorical_names = encoder.get_feature_names(categorical_columns).tolist()
+    else:
+        categorical_array = np.empty((len(data), 0))
+        categorical_names = []
+
+    x_scaled = np.hstack([numeric_array, categorical_array])
+    transformed_columns = numeric_columns + categorical_names
+    transformed_data = pd.DataFrame(x_scaled, columns=transformed_columns, index=data.index)
+
+    return data, transformed_data, x_scaled, numeric_columns, categorical_columns
 
 
-#wybór liczby klastrów
+def save_variable_table(hypothesis_name, config, numeric_columns, categorical_columns):
+    _, tables_dir, _ = get_paths(hypothesis_name)
 
-def evaluate_k_range(X_scaled, k_range=range(2, 7)):
+    rows = []
+    for column in get_hypothesis_columns(config):
+        role = "zmienna zależna" if column == config["target"] else "zmienna objaśniająca"
+
+        if column in numeric_columns:
+            variable_type = "ilościowa"
+        elif column in categorical_columns:
+            variable_type = "jakościowa"
+        else:
+            variable_type = "inna"
+
+        rows.append({
+            "zmienna": column,
+            "rola": role,
+            "typ": variable_type,
+        })
+
+    save_dataframe(
+        pd.DataFrame(rows),
+        os.path.join(tables_dir, "zmienne_do_analizy_skupien.csv")
+    )
+
+
+def evaluate_kmeans_cluster_count(x_scaled, hypothesis_name, k_range=range(2, 7)):
+    _, tables_dir, plots_dir = get_paths(hypothesis_name)
+
     rows = []
 
     for k in k_range:
         model = KMeans(n_clusters=k, random_state=RANDOM_STATE, n_init=20)
-        labels = model.fit_predict(X_scaled)
-
-        silhouette = silhouette_score(X_scaled, labels)
-        calinski = calinski_harabasz_score(X_scaled, labels)
-        davies = davies_bouldin_score(X_scaled, labels)
-        inertia = model.inertia_
+        labels = model.fit_predict(x_scaled)
 
         rows.append({
             "k": k,
-            "silhouette": silhouette,
-            "calinski_harabasz": calinski,
-            "davies_bouldin": davies,
-            "inertia": inertia,
+            "silhouette": silhouette_score(x_scaled, labels),
+            "calinski_harabasz": calinski_harabasz_score(x_scaled, labels),
+            "davies_bouldin": davies_bouldin_score(x_scaled, labels),
+            "inertia": model.inertia_,
         })
 
-    results = pd.DataFrame(rows)
-    save_dataframe(results, os.path.join(TABLES_DIR, "ocena_liczby_klastrow_kmeans.csv"))
+    result = pd.DataFrame(rows)
+
+    save_dataframe(
+        result,
+        os.path.join(tables_dir, "ocena_liczby_klastrow_kmeans.csv")
+    )
 
     plt.figure(figsize=(9, 5.5))
-    sns.lineplot(data=results, x="k", y="inertia", marker="o", color=PRIMARY_COLOR)
-    plt.title("Metoda łokcia dla k-średnich", pad=14)
+    sns.lineplot(data=result, x="k", y="inertia", marker="o", color=PRIMARY_COLOR)
+    plt.title(f"Metoda łokcia dla k-średnich - {hypothesis_name}", pad=14)
     plt.xlabel("Liczba klastrów")
     plt.ylabel("Inertia")
     plt.tight_layout()
-    plt.savefig(os.path.join(PLOTS_DIR, "kmeans_elbow.png"), dpi=220, bbox_inches="tight")
+    plt.savefig(os.path.join(plots_dir, "kmeans_elbow.png"), dpi=220, bbox_inches="tight")
     plt.close()
 
     plt.figure(figsize=(9, 5.5))
-    sns.lineplot(data=results, x="k", y="silhouette", marker="o", color=COLOR_PALETTE[1])
-    plt.title("Silhouette score dla k-średnich", pad=14)
+    sns.lineplot(data=result, x="k", y="silhouette", marker="o", color=SECONDARY_COLOR)
+    plt.title(f"Silhouette score dla k-średnich - {hypothesis_name}", pad=14)
     plt.xlabel("Liczba klastrów")
     plt.ylabel("Silhouette score")
     plt.tight_layout()
-    plt.savefig(os.path.join(PLOTS_DIR, "kmeans_silhouette.png"), dpi=220, bbox_inches="tight")
+    plt.savefig(os.path.join(plots_dir, "kmeans_silhouette.png"), dpi=220, bbox_inches="tight")
     plt.close()
 
-    return results
+    return result
 
 
-#k-means
+def kmeans_cross_validation(x_scaled, hypothesis_name, n_clusters=N_CLUSTERS, n_splits=10):
+    _, tables_dir, _ = get_paths(hypothesis_name)
 
-def kmeans_cross_validation(X_scaled, n_clusters=3, n_splits=10):
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=RANDOM_STATE)
+    kfold = KFold(n_splits=n_splits, shuffle=True, random_state=RANDOM_STATE)
     rows = []
 
-    for fold, (train_idx, test_idx) in enumerate(kf.split(X_scaled), start=1):
-        X_train = X_scaled[train_idx]
-        X_test = X_scaled[test_idx]
+    for fold, (train_index, test_index) in enumerate(kfold.split(x_scaled), start=1):
+        x_train = x_scaled[train_index]
+        x_test = x_scaled[test_index]
 
         model = KMeans(n_clusters=n_clusters, random_state=RANDOM_STATE, n_init=20)
-        model.fit(X_train)
+        model.fit(x_train)
 
-        test_labels = model.predict(X_test)
+        labels = model.predict(x_test)
 
-        if len(np.unique(test_labels)) > 1:
-            silhouette = silhouette_score(X_test, test_labels)
-            calinski = calinski_harabasz_score(X_test, test_labels)
-            davies = davies_bouldin_score(X_test, test_labels)
+        if len(np.unique(labels)) > 1:
+            silhouette = silhouette_score(x_test, labels)
+            calinski = calinski_harabasz_score(x_test, labels)
+            davies = davies_bouldin_score(x_test, labels)
         else:
             silhouette = np.nan
             calinski = np.nan
@@ -229,266 +294,438 @@ def kmeans_cross_validation(X_scaled, n_clusters=3, n_splits=10):
             "davies_bouldin": davies,
         })
 
-    cv_df = pd.DataFrame(rows)
-    save_dataframe(cv_df, os.path.join(TABLES_DIR, "kmeans_10fold_cv.csv"))
+    result = pd.DataFrame(rows)
 
-    summary_df = pd.DataFrame([{
-        "silhouette_mean": cv_df["silhouette"].mean(),
-        "silhouette_std": cv_df["silhouette"].std(),
-        "calinski_mean": cv_df["calinski_harabasz"].mean(),
-        "calinski_std": cv_df["calinski_harabasz"].std(),
-        "davies_mean": cv_df["davies_bouldin"].mean(),
-        "davies_std": cv_df["davies_bouldin"].std(),
+    save_dataframe(
+        result,
+        os.path.join(tables_dir, "kmeans_10fold_cv.csv")
+    )
+
+    summary = pd.DataFrame([{
+        "silhouette_mean": result["silhouette"].mean(),
+        "silhouette_std": result["silhouette"].std(),
+        "calinski_mean": result["calinski_harabasz"].mean(),
+        "calinski_std": result["calinski_harabasz"].std(),
+        "davies_mean": result["davies_bouldin"].mean(),
+        "davies_std": result["davies_bouldin"].std(),
     }])
-    save_dataframe(summary_df, os.path.join(TABLES_DIR, "kmeans_10fold_cv_podsumowanie.csv"))
 
-    return cv_df, summary_df
+    save_dataframe(
+        summary,
+        os.path.join(tables_dir, "kmeans_10fold_cv_podsumowanie.csv")
+    )
+
+    return result, summary
 
 
-def run_kmeans(data: pd.DataFrame, X_scaled, n_clusters=3):
+def run_kmeans(data, x_scaled, hypothesis_name, n_clusters=N_CLUSTERS):
+    _, tables_dir, _ = get_paths(hypothesis_name)
+
     model = KMeans(n_clusters=n_clusters, random_state=RANDOM_STATE, n_init=20)
-    labels = model.fit_predict(X_scaled)
+    labels = model.fit_predict(x_scaled)
 
     result = data.copy()
     result["cluster_kmeans"] = labels
 
-    save_dataframe(result, os.path.join(TABLES_DIR, "dane_z_klastrami_kmeans.csv"))
+    save_dataframe(
+        result,
+        os.path.join(tables_dir, "dane_z_klastrami_kmeans.csv")
+    )
 
-    metrics_df = pd.DataFrame([{
-        "silhouette": silhouette_score(X_scaled, labels),
-        "calinski_harabasz": calinski_harabasz_score(X_scaled, labels),
-        "davies_bouldin": davies_bouldin_score(X_scaled, labels),
+    metrics = pd.DataFrame([{
+        "silhouette": silhouette_score(x_scaled, labels),
+        "calinski_harabasz": calinski_harabasz_score(x_scaled, labels),
+        "davies_bouldin": davies_bouldin_score(x_scaled, labels),
         "inertia": model.inertia_,
     }])
-    save_dataframe(metrics_df, os.path.join(TABLES_DIR, "kmeans_metryki.csv"))
 
-    return result, model, metrics_df
+    save_dataframe(
+        metrics,
+        os.path.join(tables_dir, "kmeans_metryki.csv")
+    )
+
+    return result, model, metrics
 
 
-#em/ gaussian mixture
+def evaluate_em_cluster_count(x_scaled, hypothesis_name, component_range=range(2, 7)):
+    _, tables_dir, plots_dir = get_paths(hypothesis_name)
 
-
-def evaluate_em_components(X_scaled, component_range=range(2, 7)):
     rows = []
 
-    for k in component_range:
-        model = GaussianMixture(n_components=k, random_state=RANDOM_STATE)
-        model.fit(X_scaled)
-        labels = model.predict(X_scaled)
+    for n_components in component_range:
+        model = GaussianMixture(n_components=n_components, random_state=RANDOM_STATE)
+        model.fit(x_scaled)
+        labels = model.predict(x_scaled)
 
         if len(np.unique(labels)) > 1:
-            silhouette = silhouette_score(X_scaled, labels)
-            calinski = calinski_harabasz_score(X_scaled, labels)
-            davies = davies_bouldin_score(X_scaled, labels)
+            silhouette = silhouette_score(x_scaled, labels)
+            calinski = calinski_harabasz_score(x_scaled, labels)
+            davies = davies_bouldin_score(x_scaled, labels)
         else:
             silhouette = np.nan
             calinski = np.nan
             davies = np.nan
 
         rows.append({
-            "n_components": k,
-            "bic": model.bic(X_scaled),
-            "aic": model.aic(X_scaled),
+            "n_components": n_components,
+            "bic": model.bic(x_scaled),
+            "aic": model.aic(x_scaled),
             "silhouette": silhouette,
             "calinski_harabasz": calinski,
             "davies_bouldin": davies,
         })
 
-    results = pd.DataFrame(rows)
-    save_dataframe(results, os.path.join(TABLES_DIR, "ocena_liczby_klastrow_em.csv"))
+    result = pd.DataFrame(rows)
+
+    save_dataframe(
+        result,
+        os.path.join(tables_dir, "ocena_liczby_klastrow_em.csv")
+    )
 
     plt.figure(figsize=(9, 5.5))
-    sns.lineplot(data=results, x="n_components", y="bic", marker="o", color=COLOR_PALETTE[2])
-    plt.title("Kryterium BIC dla modelu EM", pad=14)
+    sns.lineplot(data=result, x="n_components", y="bic", marker="o", color=COLOR_PALETTE[2])
+    plt.title(f"Kryterium BIC dla EM - {hypothesis_name}", pad=14)
     plt.xlabel("Liczba komponentów")
     plt.ylabel("BIC")
     plt.tight_layout()
-    plt.savefig(os.path.join(PLOTS_DIR, "em_bic.png"), dpi=220, bbox_inches="tight")
+    plt.savefig(os.path.join(plots_dir, "em_bic.png"), dpi=220, bbox_inches="tight")
     plt.close()
 
-    return results
+    return result
 
 
-def run_em(data: pd.DataFrame, X_scaled, n_components=3):
+def run_em(data, x_scaled, hypothesis_name, n_components=N_CLUSTERS):
+    _, tables_dir, _ = get_paths(hypothesis_name)
+
     model = GaussianMixture(n_components=n_components, random_state=RANDOM_STATE)
-    model.fit(X_scaled)
-    labels = model.predict(X_scaled)
-    probs = model.predict_proba(X_scaled)
+    model.fit(x_scaled)
+
+    labels = model.predict(x_scaled)
+    probabilities = model.predict_proba(x_scaled)
 
     result = data.copy()
     result["cluster_em"] = labels
-    result["cluster_em_probability"] = probs.max(axis=1)
+    result["cluster_em_probability"] = probabilities.max(axis=1)
 
-    save_dataframe(result, os.path.join(TABLES_DIR, "dane_z_klastrami_em.csv"))
+    save_dataframe(
+        result,
+        os.path.join(tables_dir, "dane_z_klastrami_em.csv")
+    )
 
-    metrics_df = pd.DataFrame([{
-        "silhouette": silhouette_score(X_scaled, labels),
-        "calinski_harabasz": calinski_harabasz_score(X_scaled, labels),
-        "davies_bouldin": davies_bouldin_score(X_scaled, labels),
-        "bic": model.bic(X_scaled),
-        "aic": model.aic(X_scaled),
-        "srednie_prawdopodobienstwo_przynaleznosci": probs.max(axis=1).mean(),
+    metrics = pd.DataFrame([{
+        "silhouette": silhouette_score(x_scaled, labels),
+        "calinski_harabasz": calinski_harabasz_score(x_scaled, labels),
+        "davies_bouldin": davies_bouldin_score(x_scaled, labels),
+        "bic": model.bic(x_scaled),
+        "aic": model.aic(x_scaled),
+        "srednie_prawdopodobienstwo_przynaleznosci": probabilities.max(axis=1).mean(),
     }])
-    save_dataframe(metrics_df, os.path.join(TABLES_DIR, "em_metryki.csv"))
 
-    return result, model, metrics_df
+    save_dataframe(
+        metrics,
+        os.path.join(tables_dir, "em_metryki.csv")
+    )
+
+    return result, model, metrics
 
 
-#charakterystyki klastrow
+def create_cluster_profiles(
+    data,
+    hypothesis_name,
+    cluster_column,
+    prefix,
+    numeric_columns,
+    categorical_columns,
+):
+    _, tables_dir, _ = get_paths(hypothesis_name)
 
-def cluster_profiles(data: pd.DataFrame, cluster_col: str, prefix: str):
-    numeric_profile = data.groupby(cluster_col)[PROFILE_NUMERICAL].mean().reset_index()
-    save_dataframe(numeric_profile, os.path.join(TABLES_DIR, f"{prefix}_profil_numeryczny.csv"))
+    numeric_profile = data.groupby(cluster_column)[numeric_columns].mean().reset_index()
 
-    counts = data[cluster_col].value_counts().sort_index().reset_index()
-    counts.columns = [cluster_col, "liczebnosc"]
+    save_dataframe(
+        numeric_profile,
+        os.path.join(tables_dir, f"{prefix}_profil_numeryczny.csv")
+    )
+
+    counts = data[cluster_column].value_counts().sort_index().reset_index()
+    counts.columns = [cluster_column, "liczebnosc"]
     counts["procent"] = 100 * counts["liczebnosc"] / counts["liczebnosc"].sum()
-    save_dataframe(counts, os.path.join(TABLES_DIR, f"{prefix}_liczebnosci_klastrow.csv"))
 
-    for cat_col in PROFILE_CATEGORICAL:
-        table = pd.crosstab(data[cluster_col], data[cat_col], normalize="index") * 100
+    save_dataframe(
+        counts,
+        os.path.join(tables_dir, f"{prefix}_liczebnosci_klastrow.csv")
+    )
+
+    for column in categorical_columns:
+        table = pd.crosstab(data[cluster_column], data[column], normalize="index") * 100
         table = table.reset_index()
-        save_dataframe(table, os.path.join(TABLES_DIR, f"{prefix}_profil_{cat_col}.csv"))
+
+        save_dataframe(
+            table,
+            os.path.join(tables_dir, f"{prefix}_profil_{column}.csv")
+        )
+
+    binary_columns = [
+        column for column in numeric_columns
+        if set(data[column].dropna().unique()).issubset({0, 1})
+    ]
+
+    for column in binary_columns:
+        table = pd.crosstab(data[cluster_column], data[column], normalize="index") * 100
+        table = table.reset_index()
+
+        save_dataframe(
+            table,
+            os.path.join(tables_dir, f"{prefix}_profil_{column}_procentowo.csv")
+        )
 
     return numeric_profile, counts
 
 
-#wizualizacja klastrow
+def plot_clusters_pca(x_scaled, labels, hypothesis_name, filename, title):
+    _, _, plots_dir = get_paths(hypothesis_name)
 
-def plot_clusters_pca(X_scaled, labels, filename, title):
     pca = PCA(n_components=2, random_state=RANDOM_STATE)
-    coords = pca.fit_transform(X_scaled)
+    coordinates = pca.fit_transform(x_scaled)
 
-    plot_df = pd.DataFrame({
-        "PC1": coords[:, 0],
-        "PC2": coords[:, 1],
-        "cluster": labels
+    plot_data = pd.DataFrame({
+        "PC1": coordinates[:, 0],
+        "PC2": coordinates[:, 1],
+        "cluster": labels,
     })
 
     plt.figure(figsize=(9, 6))
     sns.scatterplot(
-        data=plot_df,
+        data=plot_data,
         x="PC1",
         y="PC2",
         hue="cluster",
         palette=COLOR_PALETTE,
         s=70,
-        alpha=0.8
+        alpha=0.8,
     )
     plt.title(title, pad=14)
     plt.tight_layout()
-    plt.savefig(filename, dpi=220, bbox_inches="tight")
+    plt.savefig(os.path.join(plots_dir, filename), dpi=220, bbox_inches="tight")
     plt.close()
 
 
-def plot_cluster_profiles(numeric_profile: pd.DataFrame, cluster_col: str, filename: str, title: str):
-    plot_df = numeric_profile.melt(id_vars=cluster_col, var_name="zmienna", value_name="srednia")
+def plot_profile_heatmap(profile, cluster_column, hypothesis_name, filename, title):
+    _, _, plots_dir = get_paths(hypothesis_name)
 
-    plt.figure(figsize=(11, 6))
-    sns.barplot(
-        data=plot_df,
-        x="zmienna",
-        y="srednia",
-        hue=cluster_col,
-        palette=COLOR_PALETTE
+    values = profile.set_index(cluster_column)
+    standardized = values.copy()
+
+    for column in standardized.columns:
+        std = standardized[column].std()
+        if std == 0 or pd.isna(std):
+            standardized[column] = 0
+        else:
+            standardized[column] = (standardized[column] - standardized[column].mean()) / std
+
+    plt.figure(figsize=(10, 5.5))
+    sns.heatmap(
+        standardized,
+        annot=True,
+        fmt=".2f",
+        cmap=sns.light_palette(PRIMARY_COLOR, as_cmap=True),
+        linewidths=1,
+        linecolor="white",
     )
     plt.title(title, pad=14)
-    plt.xticks(rotation=20)
+    plt.xlabel("Zmienna")
+    plt.ylabel("Klaster")
     plt.tight_layout()
-    plt.savefig(filename, dpi=220, bbox_inches="tight")
+    plt.savefig(os.path.join(plots_dir, filename), dpi=220, bbox_inches="tight")
     plt.close()
 
 
+def plot_profile_bars(profile, cluster_column, hypothesis_name, prefix):
+    _, _, plots_dir = get_paths(hypothesis_name)
+
+    for column in profile.columns:
+        if column == cluster_column:
+            continue
+
+        plt.figure(figsize=(8, 5))
+        sns.barplot(
+            data=profile,
+            x=cluster_column,
+            y=column,
+            palette=COLOR_PALETTE,
+        )
+        plt.title(f"Średnia zmiennej {column} w klastrach - {prefix}", pad=14)
+        plt.xlabel("Klaster")
+        plt.ylabel(f"Średnia {column}")
+        plt.tight_layout()
+        plt.savefig(os.path.join(plots_dir, f"{prefix}_profil_{column}.png"), dpi=220, bbox_inches="tight")
+        plt.close()
 
 
-def compare_with_hypotheses(kmeans_profile: pd.DataFrame, em_profile: pd.DataFrame):
+def compare_clusters_with_hypothesis(hypothesis_name, kmeans_profile, em_profile, numeric_columns):
+    _, tables_dir, _ = get_paths(hypothesis_name)
+
     comparison = pd.DataFrame({
-        "zmienna": PROFILE_NUMERICAL,
-        "srednia_kmeans_min": [kmeans_profile[col].min() for col in PROFILE_NUMERICAL],
-        "srednia_kmeans_max": [kmeans_profile[col].max() for col in PROFILE_NUMERICAL],
-        "srednia_em_min": [em_profile[col].min() for col in PROFILE_NUMERICAL],
-        "srednia_em_max": [em_profile[col].max() for col in PROFILE_NUMERICAL],
+        "zmienna": numeric_columns,
+        "kmeans_min": [kmeans_profile[column].min() for column in numeric_columns],
+        "kmeans_max": [kmeans_profile[column].max() for column in numeric_columns],
+        "em_min": [em_profile[column].min() for column in numeric_columns],
+        "em_max": [em_profile[column].max() for column in numeric_columns],
     })
 
-    save_dataframe(comparison, os.path.join(TABLES_DIR, "porownanie_klastrow_z_hipotezami.csv"))
+    comparison["roznica_kmeans"] = comparison["kmeans_max"] - comparison["kmeans_min"]
+    comparison["roznica_em"] = comparison["em_max"] - comparison["em_min"]
+
+    save_dataframe(
+        comparison,
+        os.path.join(tables_dir, "porownanie_klastrow_z_hipoteza.csv")
+    )
+
     return comparison
 
 
+def run_hypothesis(df, hypothesis_name, config):
+    print(f"\n{hypothesis_name}")
+
+    data, transformed_data, x_scaled, numeric_columns, categorical_columns = prepare_data_for_clustering(df, config)
+
+    save_variable_table(hypothesis_name, config, numeric_columns, categorical_columns)
+
+    kmeans_evaluation = evaluate_kmeans_cluster_count(x_scaled, hypothesis_name)
+    kmeans_cv, kmeans_cv_summary = kmeans_cross_validation(x_scaled, hypothesis_name)
+
+    kmeans_result, kmeans_model, kmeans_metrics = run_kmeans(data, x_scaled, hypothesis_name)
+    kmeans_profile, kmeans_counts = create_cluster_profiles(
+        kmeans_result,
+        hypothesis_name,
+        "cluster_kmeans",
+        "kmeans",
+        numeric_columns,
+        categorical_columns,
+    )
+
+    plot_clusters_pca(
+        x_scaled,
+        kmeans_result["cluster_kmeans"],
+        hypothesis_name,
+        "kmeans_pca.png",
+        f"Klastry k-średnich - {hypothesis_name}",
+    )
+
+    plot_profile_heatmap(
+        kmeans_profile,
+        "cluster_kmeans",
+        hypothesis_name,
+        "kmeans_profile_heatmap.png",
+        f"Profil klastrów k-średnich - {hypothesis_name}",
+    )
+
+    plot_profile_bars(
+        kmeans_profile,
+        "cluster_kmeans",
+        hypothesis_name,
+        "kmeans",
+    )
+
+    em_evaluation = evaluate_em_cluster_count(x_scaled, hypothesis_name)
+
+    em_result, em_model, em_metrics = run_em(data, x_scaled, hypothesis_name)
+    em_profile, em_counts = create_cluster_profiles(
+        em_result,
+        hypothesis_name,
+        "cluster_em",
+        "em",
+        numeric_columns,
+        categorical_columns,
+    )
+
+    plot_clusters_pca(
+        x_scaled,
+        em_result["cluster_em"],
+        hypothesis_name,
+        "em_pca.png",
+        f"Klastry EM - {hypothesis_name}",
+    )
+
+    plot_profile_heatmap(
+        em_profile,
+        "cluster_em",
+        hypothesis_name,
+        "em_profile_heatmap.png",
+        f"Profil klastrów EM - {hypothesis_name}",
+    )
+
+    plot_profile_bars(
+        em_profile,
+        "cluster_em",
+        hypothesis_name,
+        "em",
+    )
+
+    comparison = compare_clusters_with_hypothesis(
+        hypothesis_name,
+        kmeans_profile,
+        em_profile,
+        numeric_columns,
+    )
+
+    return {
+        "kmeans_evaluation": kmeans_evaluation,
+        "kmeans_cv": kmeans_cv,
+        "kmeans_cv_summary": kmeans_cv_summary,
+        "kmeans_metrics": kmeans_metrics,
+        "kmeans_profile": kmeans_profile,
+        "kmeans_counts": kmeans_counts,
+        "em_evaluation": em_evaluation,
+        "em_metrics": em_metrics,
+        "em_profile": em_profile,
+        "em_counts": em_counts,
+        "comparison": comparison,
+    }
+
+
+def save_global_summary(results):
+    rows = []
+
+    for hypothesis_name, result in results.items():
+        kmeans_metrics = result["kmeans_metrics"].iloc[0]
+        em_metrics = result["em_metrics"].iloc[0]
+
+        rows.append({
+            "hipoteza": hypothesis_name,
+            "kmeans_silhouette": kmeans_metrics["silhouette"],
+            "kmeans_calinski_harabasz": kmeans_metrics["calinski_harabasz"],
+            "kmeans_davies_bouldin": kmeans_metrics["davies_bouldin"],
+            "em_silhouette": em_metrics["silhouette"],
+            "em_calinski_harabasz": em_metrics["calinski_harabasz"],
+            "em_davies_bouldin": em_metrics["davies_bouldin"],
+            "em_bic": em_metrics["bic"],
+            "em_aic": em_metrics["aic"],
+            "em_srednie_prawdopodobienstwo": em_metrics["srednie_prawdopodobienstwo_przynaleznosci"],
+        })
+
+    save_dataframe(
+        pd.DataFrame(rows),
+        os.path.join(OUTPUT_DIR, "podsumowanie_analizy_skupien.csv")
+    )
 
 
 def main():
-
+    reset_output_directory()
     create_directories()
     set_plot_style()
 
-    print(f"BASE_DIR: {BASE_DIR}")
-    print(f"FILE_PATH: {FILE_PATH}")
-    print(f"OUTPUT_DIR: {OUTPUT_DIR}")
-
-    df = load_data(FILE_PATH)
+    df = load_data()
     df = clean_data(df)
 
-    data, X, X_scaled, scaler = prepare_clustering_data(df)
+    results = {}
 
-    print("\nOcena liczby klastrów dla k-średnich...")
-    kmeans_eval = evaluate_k_range(X_scaled, k_range=range(2, 7))
+    for hypothesis_name, config in HYPOTHESES.items():
+        results[hypothesis_name] = run_hypothesis(df, hypothesis_name, config)
 
-    print("\nOcena liczby komponentów dla EM...")
-    em_eval = evaluate_em_components(X_scaled, component_range=range(2, 7))
+    save_global_summary(results)
 
-    print("\n10-krotny sprawdzian krzyżowy dla k-średnich...")
-    kmeans_cv_df, kmeans_cv_summary = kmeans_cross_validation(X_scaled, n_clusters=N_CLUSTERS, n_splits=10)
-
-    print("\nUruchamianie k-średnich...")
-    kmeans_result, kmeans_model, kmeans_metrics = run_kmeans(data, X_scaled, n_clusters=N_CLUSTERS)
-
-    print("\nProfilowanie klastrów k-średnich...")
-    kmeans_numeric_profile, kmeans_counts = cluster_profiles(kmeans_result, "cluster_kmeans", "kmeans")
-
-    plot_clusters_pca(
-        X_scaled,
-        kmeans_result["cluster_kmeans"],
-        os.path.join(PLOTS_DIR, "kmeans_pca.png"),
-        "Klastry k-średnich w przestrzeni PCA"
-    )
-
-    plot_cluster_profiles(
-        kmeans_numeric_profile,
-        "cluster_kmeans",
-        os.path.join(PLOTS_DIR, "kmeans_profile.png"),
-        "Charakterystyka skupień - k-średnich"
-    )
-
-    print("\nUruchamianie EM...")
-    em_result, em_model, em_metrics = run_em(data, X_scaled, n_components=N_CLUSTERS)
-
-    print("\nProfilowanie klastrów EM...")
-    em_numeric_profile, em_counts = cluster_profiles(em_result, "cluster_em", "em")
-
-    plot_clusters_pca(
-        X_scaled,
-        em_result["cluster_em"],
-        os.path.join(PLOTS_DIR, "em_pca.png"),
-        "Klastry EM w przestrzeni PCA"
-    )
-
-    plot_cluster_profiles(
-        em_numeric_profile,
-        "cluster_em",
-        os.path.join(PLOTS_DIR, "em_profile.png"),
-        "Charakterystyka skupień - EM"
-    )
-
-    print("\nPorównanie skupień z hipotezami...")
-    comparison_df = compare_with_hypotheses(kmeans_numeric_profile, em_numeric_profile)
-
-    print("\n=== KONIEC ===")
-    print(f"Wyniki zapisano w: {OUTPUT_DIR}")
+    print(f"\nWyniki zapisano w: {OUTPUT_DIR}")
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print("\nWYSTĄPIŁ BŁĄD:")
-        print(type(e).__name__, "-", e)
+    main()
