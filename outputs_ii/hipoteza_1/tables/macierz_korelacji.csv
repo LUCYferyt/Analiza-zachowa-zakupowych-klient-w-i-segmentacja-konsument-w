@@ -1,0 +1,5 @@
+zmienna,NumWebPurchases,Income,Recency,NumWebVisitsMonth
+NumWebPurchases,1.0,0.388,-0.004,-0.053
+Income,0.388,1.0,-0.004,-0.553
+Recency,-0.004,-0.004,1.0,-0.017
+NumWebVisitsMonth,-0.053,-0.553,-0.017,1.0

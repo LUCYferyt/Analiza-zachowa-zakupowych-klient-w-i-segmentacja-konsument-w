@@ -1,0 +1,5 @@
+zmienna,shapiro_stat,p_value,czy_normalny_przy_0_05,liczba_odstajacych_zscore_gt_3
+NumWebPurchases,0.908274,0.0,nie,3
+Income,0.776885,0.0,nie,8
+Recency,0.95428,0.0,nie,0
+NumWebVisitsMonth,0.929855,0.0,nie,9

@@ -1,0 +1,4 @@
+zmienna,shapiro_stat,p_value,czy_normalny_przy_0_05,liczba_odstajacych_zscore_gt_3
+MntWines,0.838414,0.0,nie,15
+Income,0.776885,0.0,nie,8
+Kidhome,0.675471,0.0,nie,0

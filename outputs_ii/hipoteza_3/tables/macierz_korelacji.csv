@@ -1,0 +1,5 @@
+zmienna,Response,Income,Recency,NumCatalogPurchases
+Response,1.0,0.133,-0.199,0.219
+Income,0.133,1.0,-0.004,0.589
+Recency,-0.199,-0.004,1.0,0.023
+NumCatalogPurchases,0.219,0.589,0.023,1.0

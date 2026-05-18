@@ -1,0 +1,7 @@
+badana_zaleznosc,typ_zaleznosci,korelacja_Pearsona,interpretacja
+Response - Income,zmienna zależna vs predyktor,0.133,słaba zależność dodatnia
+Response - Recency,zmienna zależna vs predyktor,-0.199,słaba zależność ujemna
+Response - NumCatalogPurchases,zmienna zależna vs predyktor,0.219,słaba zależność dodatnia
+Income - Recency,zależność między predyktorami,-0.004,brak lub bardzo słaba zależność ujemna
+Income - NumCatalogPurchases,zależność między predyktorami,0.589,dość silna zależność dodatnia
+Recency - NumCatalogPurchases,zależność między predyktorami,0.023,brak lub bardzo słaba zależność dodatnia

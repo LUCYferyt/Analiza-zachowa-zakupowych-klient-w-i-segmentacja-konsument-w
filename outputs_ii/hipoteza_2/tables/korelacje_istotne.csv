@@ -1,0 +1,4 @@
+badana_zaleznosc,typ_zaleznosci,korelacja_Pearsona,interpretacja
+MntWines - Income,zmienna zależna vs predyktor,0.579,dość silna zależność dodatnia
+MntWines - Kidhome,zmienna zależna vs predyktor,-0.498,umiarkowana zależność ujemna
+Income - Kidhome,zależność między predyktorami,-0.429,umiarkowana zależność ujemna

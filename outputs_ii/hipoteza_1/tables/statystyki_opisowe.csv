@@ -1,0 +1,5 @@
+zmienna,liczba_przypadkow,srednia,mediana,moda,minimum,maksimum,odchylenie_std,wariancja
+NumWebPurchases,2212,4.083,4.0,2.0,0.0,27.0,2.742,7.518
+Income,2212,52232.511,51381.5,7500.0,1730.0,666666.0,25187.455,634407907.462
+Recency,2212,49.051,49.0,56.0,0.0,99.0,28.941,837.57
+NumWebVisitsMonth,2212,5.32,6.0,7.0,0.0,20.0,2.423,5.873

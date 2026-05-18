@@ -1,0 +1,7 @@
+badana_zaleznosc,typ_zaleznosci,korelacja_Pearsona,interpretacja
+NumWebPurchases - Income,zmienna zależna vs predyktor,0.388,umiarkowana zależność dodatnia
+NumWebPurchases - Recency,zmienna zależna vs predyktor,-0.004,brak lub bardzo słaba zależność ujemna
+NumWebPurchases - NumWebVisitsMonth,zmienna zależna vs predyktor,-0.053,brak lub bardzo słaba zależność ujemna
+Income - Recency,zależność między predyktorami,-0.004,brak lub bardzo słaba zależność ujemna
+Income - NumWebVisitsMonth,zależność między predyktorami,-0.553,dość silna zależność ujemna
+Recency - NumWebVisitsMonth,zależność między predyktorami,-0.017,brak lub bardzo słaba zależność ujemna

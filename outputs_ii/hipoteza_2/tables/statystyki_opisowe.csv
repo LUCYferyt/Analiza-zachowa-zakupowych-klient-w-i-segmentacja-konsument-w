@@ -1,0 +1,4 @@
+zmienna,liczba_przypadkow,srednia,mediana,moda,minimum,maksimum,odchylenie_std,wariancja
+MntWines,2212,305.031,173.5,2.0,0.0,1493.0,337.611,113981.36
+Income,2212,52232.511,51381.5,7500.0,1730.0,666666.0,25187.455,634407907.462
+Kidhome,2212,0.443,0.0,0.0,0.0,2.0,0.537,0.288

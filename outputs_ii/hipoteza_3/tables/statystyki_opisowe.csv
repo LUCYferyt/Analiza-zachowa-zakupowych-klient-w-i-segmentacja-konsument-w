@@ -1,0 +1,5 @@
+zmienna,liczba_przypadkow,srednia,mediana,moda,minimum,maksimum,odchylenie_std,wariancja
+Response,2212,0.15,0.0,0.0,0.0,1.0,0.357,0.127
+Income,2212,52232.511,51381.5,7500.0,1730.0,666666.0,25187.455,634407907.462
+Recency,2212,49.051,49.0,56.0,0.0,99.0,28.941,837.57
+NumCatalogPurchases,2212,2.668,2.0,0.0,0.0,28.0,2.924,8.552
