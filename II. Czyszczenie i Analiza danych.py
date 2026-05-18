@@ -1,4 +1,5 @@
 import os
+import itertools
 import warnings
 
 import numpy as np
@@ -7,105 +8,103 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from scipy.stats import chi2_contingency, shapiro, zscore
+from sklearn.feature_selection import chi2
+from sklearn.preprocessing import KBinsDiscretizer, LabelEncoder, MinMaxScaler
+
+warnings.filterwarnings("ignore")
 
 
-FILE_PATH = "data/marketing_campaign.csv"
-OUTPUT_DIR = "outputs_ii"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FILE_PATH = os.path.join(BASE_DIR, "data", "marketing_campaign.csv")
+OUTPUT_DIR = os.path.join(BASE_DIR, "outputs_ii")
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-os.makedirs(f"{OUTPUT_DIR}/tables", exist_ok=True)
-os.makedirs(f"{OUTPUT_DIR}/plots", exist_ok=True)
+RANDOM_STATE = 42
 
 COLOR_PALETTE = [
-    "#675285",  # fiolet
-    "#D16BA5",  # magenta
-    "#6C63FF",  # błękitowo-fioletowy
-    "#00B4D8",  # błękit
-    "#A23E48",  # granatowo-bordowy
-    "#F4A6C1",  # jasny róż
-    "#B8C0FF",  # pastelowy niebieski
+    "#675285",
+    "#D16BA5",
+    "#6C63FF",
+    "#00B4D8",
+    "#A23E48",
+    "#F4A6C1",
+    "#B8C0FF",
 ]
 
 PRIMARY_COLOR = "#675285"
 SECONDARY_COLOR = "#D16BA5"
-ACCENT_COLOR = "#A23E48"
-LIGHT_COLOR = "#F9EFF5"
 TEXT_COLOR = "#4A3B5F"
 GRID_COLOR = "#E6DFF0"
 EDGE_COLOR = "#D8CBE6"
 AXIS_BACKGROUND = "#FCF8FD"
 FIGURE_BACKGROUND = "#FFFDFE"
 
-NUMERIC_VARS = [
-    "NumWebPurchases",
-    "Income",
-    "Recency",
-    "NumWebVisitsMonth",
-    "MntWines",
-    "Kidhome",
-    "Response",
-    "NumCatalogPurchases",
-]
 
-CATEGORICAL_VARS = [
-    "Marital_Status",
-]
+HYPOTHESES = {
+    "hipoteza_1": {
+        "target": "NumWebPurchases",
+        "predictors": ["Income", "Recency", "NumWebVisitsMonth"],
+    },
+    "hipoteza_2": {
+        "target": "MntWines",
+        "predictors": ["Income", "Kidhome", "Marital_Status"],
+    },
+    "hipoteza_3": {
+        "target": "Response",
+        "predictors": ["Income", "Recency", "NumCatalogPurchases"],
+    },
+}
 
-BOXPLOT_CATEGORIZED_PAIRS = [
-    ("MntWines", "Marital_Status"),
-    ("Income", "Marital_Status"),
-]
 
-SCATTER_PAIRS = [
-    ("Income", "NumWebPurchases"),
-    ("Income", "MntWines"),
-    ("NumCatalogPurchases", "Response"),
-]
+def create_directories():
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-SCATTER_GROUP_VAR = "Marital_Status"
+    for hypothesis_name in HYPOTHESES:
+        os.makedirs(os.path.join(OUTPUT_DIR, hypothesis_name, "tables"), exist_ok=True)
+        os.makedirs(os.path.join(OUTPUT_DIR, hypothesis_name, "plots"), exist_ok=True)
 
-#styl wykresów
 
 def set_plot_style():
     sns.set_theme(style="whitegrid", context="talk")
     sns.set_palette(COLOR_PALETTE)
 
-    plt.rcParams["figure.figsize"] = (9, 5.5)
+    plt.rcParams["figure.figsize"] = (10, 6)
     plt.rcParams["figure.facecolor"] = FIGURE_BACKGROUND
     plt.rcParams["axes.facecolor"] = AXIS_BACKGROUND
     plt.rcParams["axes.edgecolor"] = EDGE_COLOR
     plt.rcParams["axes.labelcolor"] = TEXT_COLOR
     plt.rcParams["axes.titlecolor"] = TEXT_COLOR
     plt.rcParams["axes.titleweight"] = "bold"
-    plt.rcParams["axes.titlesize"] = 14
-    plt.rcParams["axes.labelsize"] = 11
     plt.rcParams["xtick.color"] = TEXT_COLOR
     plt.rcParams["ytick.color"] = TEXT_COLOR
-    plt.rcParams["text.color"] = TEXT_COLOR
     plt.rcParams["grid.color"] = GRID_COLOR
-    plt.rcParams["grid.alpha"] = 0.85
-    plt.rcParams["axes.grid"] = True
+    plt.rcParams["text.color"] = TEXT_COLOR
 
 
-def load_data(path: str) -> pd.DataFrame:
-    return pd.read_csv(path, sep="\t")
+def get_paths(hypothesis_name):
+    hypothesis_dir = os.path.join(OUTPUT_DIR, hypothesis_name)
+    tables_dir = os.path.join(hypothesis_dir, "tables")
+    plots_dir = os.path.join(hypothesis_dir, "plots")
+    return hypothesis_dir, tables_dir, plots_dir
 
 
-def clean_data(df: pd.DataFrame) -> pd.DataFrame:
+def save_table(df, path):
+    df.to_csv(path, index=False)
+    print(f"Zapisano: {path}")
+
+
+def load_data():
+    if not os.path.exists(FILE_PATH):
+        raise FileNotFoundError(f"Nie znaleziono pliku: {FILE_PATH}")
+
+    return pd.read_csv(FILE_PATH, sep="\t")
+
+
+def clean_data(df):
     df = df.copy()
-
     df = df.drop_duplicates()
-
-    required_cols = list(set(NUMERIC_VARS + CATEGORICAL_VARS))
-    df = df.dropna(subset=required_cols)
 
     if "ID" in df.columns:
         df = df.drop(columns=["ID"])
-
-    for col in NUMERIC_VARS:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    df = df.dropna(subset=NUMERIC_VARS)
 
     if "Marital_Status" in df.columns:
         df["Marital_Status"] = df["Marital_Status"].replace({
@@ -122,423 +121,435 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-#statysttyki opisowe
+def get_hypothesis_columns(config):
+    return [config["target"]] + config["predictors"]
 
-def descriptive_stats(df: pd.DataFrame, numeric_cols: list[str]) -> pd.DataFrame:
+
+def get_numeric_columns(df, columns):
+    return [column for column in columns if pd.api.types.is_numeric_dtype(df[column])]
+
+
+def get_categorical_columns(df, columns):
+    return [column for column in columns if not pd.api.types.is_numeric_dtype(df[column])]
+
+
+def descriptive_statistics(df, columns):
     rows = []
 
-    for col in numeric_cols:
-        series = df[col].dropna()
-        mode_values = series.mode()
+    for column in columns:
+        values = df[column].dropna()
+
+        if values.empty:
+            continue
+
+        mode_values = values.mode()
+        mode_value = mode_values.iloc[0] if len(mode_values) > 0 else np.nan
 
         rows.append({
-            "zmienna": col,
-            "liczba_przypadkow": series.count(),
-            "srednia": series.mean(),
-            "mediana": series.median(),
-            "moda": mode_values.iloc[0] if not mode_values.empty else np.nan,
-            "minimum": series.min(),
-            "maksimum": series.max(),
-            "odchylenie_std": series.std(),
-            "wariancja": series.var(),
+            "zmienna": column,
+            "liczba_przypadkow": int(values.count()),
+            "srednia": values.mean(),
+            "mediana": values.median(),
+            "moda": mode_value,
+            "minimum": values.min(),
+            "maksimum": values.max(),
+            "odchylenie_std": values.std(),
+            "wariancja": values.var(),
         })
 
-    result = pd.DataFrame(rows)
-    result.to_csv(f"{OUTPUT_DIR}/tables/statystyki_opisowe.csv", index=False)
+    return pd.DataFrame(rows).round(3)
+
+
+def frequency_table(df, column):
+    counts = df[column].value_counts(dropna=False).reset_index()
+    counts.columns = [column, "liczebnosc"]
+    counts["procent"] = counts["liczebnosc"] / counts["liczebnosc"].sum() * 100
+    return counts.round(3)
+
+
+def correlation_interpretation(value):
+    abs_value = abs(value)
+
+    if abs_value < 0.1:
+        strength = "brak lub bardzo słaba zależność"
+    elif abs_value < 0.3:
+        strength = "słaba zależność"
+    elif abs_value < 0.5:
+        strength = "umiarkowana zależność"
+    elif abs_value < 0.7:
+        strength = "dość silna zależność"
+    else:
+        strength = "silna zależność"
+
+    if value > 0:
+        direction = "dodatnia"
+    elif value < 0:
+        direction = "ujemna"
+    else:
+        direction = "brak kierunku"
+
+    if direction == "brak kierunku":
+        return strength
+
+    return f"{strength} {direction}"
+
+
+def correlation_table(df, config):
+    target = config["target"]
+    predictors = config["predictors"]
+
+    columns = [target] + predictors
+    numeric_columns = get_numeric_columns(df, columns)
+
+    rows = []
+
+    for left, right in itertools.combinations(numeric_columns, 2):
+        corr = df[[left, right]].dropna().corr(method="pearson").iloc[0, 1]
+
+        if target in [left, right]:
+            relation_type = "zmienna zależna vs predyktor"
+        else:
+            relation_type = "zależność między predyktorami"
+
+        rows.append({
+            "badana_zaleznosc": f"{left} - {right}",
+            "typ_zaleznosci": relation_type,
+            "korelacja_Pearsona": corr,
+            "interpretacja": correlation_interpretation(corr),
+        })
+
+    return pd.DataFrame(rows).round(3)
+
+
+def normality_and_outliers(df, columns):
+    rows = []
+
+    for column in columns:
+        values = df[column].dropna()
+
+        if values.empty:
+            continue
+
+        sample = values.sample(min(len(values), 5000), random_state=RANDOM_STATE)
+
+        shapiro_stat, p_value = shapiro(sample)
+
+        if values.std() == 0:
+            outliers_count = 0
+        else:
+            outliers_count = int((np.abs(zscore(values)) > 3).sum())
+
+        rows.append({
+            "zmienna": column,
+            "shapiro_stat": shapiro_stat,
+            "p_value": p_value,
+            "czy_normalny_przy_0_05": "tak" if p_value > 0.05 else "nie",
+            "liczba_odstajacych_zscore_gt_3": outliers_count,
+        })
+
+    return pd.DataFrame(rows).round(6)
+
+
+def response_report_for_hypothesis_3(df):
+    table = df.groupby("Response").agg(
+        liczebnosc=("Response", "size"),
+        sredni_Income=("Income", "mean"),
+        mediana_Income=("Income", "median"),
+        sredni_Recency=("Recency", "mean"),
+        mediana_Recency=("Recency", "median"),
+        sredni_NumCatalogPurchases=("NumCatalogPurchases", "mean"),
+        mediana_NumCatalogPurchases=("NumCatalogPurchases", "median"),
+    ).reset_index()
+
+    table["procent"] = table["liczebnosc"] / table["liczebnosc"].sum() * 100
+
+    table = table[
+        [
+            "Response",
+            "liczebnosc",
+            "procent",
+            "sredni_Income",
+            "mediana_Income",
+            "sredni_Recency",
+            "mediana_Recency",
+            "sredni_NumCatalogPurchases",
+            "mediana_NumCatalogPurchases",
+        ]
+    ]
+
+    return table.round(3)
+
+
+def chi_square_importance(df, config, hypothesis_name):
+    _, tables_dir, plots_dir = get_paths(hypothesis_name)
+
+    target = config["target"]
+    predictors = config["predictors"]
+
+    data = df[[target] + predictors].dropna().copy()
+
+    if data[target].nunique() > 10 and pd.api.types.is_numeric_dtype(data[target]):
+        target_discretizer = KBinsDiscretizer(n_bins=4, encode="ordinal", strategy="quantile")
+        y = target_discretizer.fit_transform(data[[target]]).ravel()
+    else:
+        y = data[target]
+
+    if not pd.api.types.is_numeric_dtype(pd.Series(y)):
+        encoder = LabelEncoder()
+        y = encoder.fit_transform(y)
+
+    processed_predictors = []
+
+    for predictor in predictors:
+        if pd.api.types.is_numeric_dtype(data[predictor]):
+            discretizer = KBinsDiscretizer(n_bins=4, encode="ordinal", strategy="quantile")
+            transformed = discretizer.fit_transform(data[[predictor]]).ravel()
+            processed_predictors.append(pd.Series(transformed, name=predictor, index=data.index))
+        else:
+            encoded = LabelEncoder().fit_transform(data[predictor].astype(str))
+            processed_predictors.append(pd.Series(encoded, name=predictor, index=data.index))
+
+    x = pd.concat(processed_predictors, axis=1)
+    x = MinMaxScaler().fit_transform(x)
+
+    chi_values, p_values = chi2(x, y)
+
+    result = pd.DataFrame({
+        "zmienna": predictors,
+        "chi2": chi_values,
+        "p_value": p_values,
+    }).sort_values("chi2", ascending=False)
+
+    save_table(result.round(6), os.path.join(tables_dir, "chi2_waznosc_predyktorow.csv"))
+
+    plt.figure(figsize=(9, 5.5))
+    sns.barplot(data=result, y="zmienna", x="chi2", palette=COLOR_PALETTE)
+    plt.title(f"Diagram ważności na podstawie statystyki Chi^2 - {hypothesis_name}", pad=14)
+    plt.xlabel("Wartość statystyki Chi^2")
+    plt.ylabel("Zmienna")
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, "chi2_waznosc_predyktorow.png"), dpi=220, bbox_inches="tight")
+    plt.close()
+
     return result
 
 
-#tab liczebnosci
+def plot_histograms(df, numeric_columns, hypothesis_name):
+    _, _, plots_dir = get_paths(hypothesis_name)
 
-def frequency_tables(df: pd.DataFrame, categorical_cols: list[str]) -> dict:
-    results = {}
-
-    for col in categorical_cols:
-        freq = df[col].value_counts(dropna=False).reset_index()
-        freq.columns = [col, "liczebnosc"]
-        freq["procent"] = 100 * freq["liczebnosc"] / freq["liczebnosc"].sum()
-        freq.to_csv(f"{OUTPUT_DIR}/tables/tabela_licznosci_{col}.csv", index=False)
-        results[col] = freq
-
-    return results
-
-#tab krzyzowa
-
-def multivariate_table(df: pd.DataFrame) -> pd.DataFrame:
-    table = pd.crosstab(df["Marital_Status"], df["Response"], margins=True)
-    table.to_csv(f"{OUTPUT_DIR}/tables/tabela_krzyzowa_marital_response.csv")
-    return table
-
-
-#histogram
-
-def plot_histograms(df: pd.DataFrame, numeric_cols: list[str]):
-    for i, col in enumerate(numeric_cols):
+    for column in numeric_columns:
         plt.figure(figsize=(9, 5.5))
-        sns.histplot(
-            df[col],
-            kde=True,
-            bins=20,
-            color=COLOR_PALETTE[i % len(COLOR_PALETTE)],
-            edgecolor="white",
-            linewidth=1.2,
-            alpha=0.9
-        )
-        plt.title(f"Histogram zmiennej {col}", pad=14)
-        plt.xlabel(col)
+        sns.histplot(data=df, x=column, bins=30, kde=True, color=PRIMARY_COLOR)
+        plt.title(f"Histogram zmiennej {column} - {hypothesis_name}", pad=14)
+        plt.xlabel(column)
         plt.ylabel("Liczebność")
         plt.tight_layout()
-        plt.savefig(f"{OUTPUT_DIR}/plots/hist_{col}.png", dpi=220, bbox_inches="tight")
+        plt.savefig(os.path.join(plots_dir, f"histogram_{column}.png"), dpi=220, bbox_inches="tight")
         plt.close()
 
 
-def categorized_histograms(df: pd.DataFrame):
-    df["Income_group"] = pd.qcut(df["Income"], q=4, duplicates="drop")
-    df["Recency_group"] = pd.cut(df["Recency"], bins=4)
+def plot_boxplots(df, numeric_columns, hypothesis_name):
+    _, _, plots_dir = get_paths(hypothesis_name)
 
-    plt.figure(figsize=(9, 5.5))
-    sns.histplot(
-        data=df,
-        x="NumWebPurchases",
-        hue="Income_group",
-        multiple="stack",
-        bins=15,
-        palette=COLOR_PALETTE[:4],
-        edgecolor="white",
-        linewidth=1
-    )
-    plt.title("Histogram skategoryzowany: NumWebPurchases względem Income_group", pad=14)
-    plt.tight_layout()
-    plt.savefig(f"{OUTPUT_DIR}/plots/hist_cat_NumWebPurchases_Income_group.png", dpi=220, bbox_inches="tight")
-    plt.close()
-
-    plt.figure(figsize=(9, 5.5))
-    sns.histplot(
-        data=df,
-        x="MntWines",
-        hue="Marital_Status",
-        multiple="stack",
-        bins=20,
-        palette=COLOR_PALETTE,
-        edgecolor="white",
-        linewidth=1
-    )
-    plt.title("Histogram skategoryzowany: MntWines względem Marital_Status", pad=14)
-    plt.tight_layout()
-    plt.savefig(f"{OUTPUT_DIR}/plots/hist_cat_MntWines_Marital_Status.png", dpi=220, bbox_inches="tight")
-    plt.close()
-
-    plt.figure(figsize=(9, 5.5))
-    sns.histplot(
-        data=df,
-        x="Response",
-        hue="Recency_group",
-        multiple="stack",
-        bins=2,
-        palette=COLOR_PALETTE[:4],
-        edgecolor="white",
-        linewidth=1
-    )
-    plt.title("Histogram skategoryzowany: Response względem Recency_group", pad=14)
-    plt.tight_layout()
-    plt.savefig(f"{OUTPUT_DIR}/plots/hist_cat_Response_Recency_group.png", dpi=220, bbox_inches="tight")
-    plt.close()
+    for column in numeric_columns:
+        plt.figure(figsize=(8, 5))
+        sns.boxplot(data=df, y=column, color=PRIMARY_COLOR)
+        plt.title(f"Wykres ramka-wąsy dla {column} - {hypothesis_name}", pad=14)
+        plt.ylabel(column)
+        plt.tight_layout()
+        plt.savefig(os.path.join(plots_dir, f"boxplot_{column}.png"), dpi=220, bbox_inches="tight")
+        plt.close()
 
 
-#średnie w grupach
+def plot_categorized_boxplots(df, config, hypothesis_name):
+    _, _, plots_dir = get_paths(hypothesis_name)
 
-def interaction_plots(df: pd.DataFrame):
-    mean_table = df.groupby("Marital_Status", as_index=False)["MntWines"].mean()
-    mean_table.to_csv(f"{OUTPUT_DIR}/tables/srednie_w_grupach_MntWines_Marital_Status.csv", index=False)
+    columns = get_hypothesis_columns(config)
+    numeric_columns = get_numeric_columns(df, columns)
+    categorical_columns = get_categorical_columns(df, columns)
 
-    plt.figure(figsize=(9, 5.5))
-    sns.pointplot(
-        data=df,
-        x="Marital_Status",
-        y="MntWines",
-        color=PRIMARY_COLOR,
-        errorbar=None
-    )
-    plt.title("Wykres średnich w grupach: MntWines względem Marital_Status", pad=14)
-    plt.tight_layout()
-    plt.savefig(f"{OUTPUT_DIR}/plots/interaction_MntWines_Marital_Status.png", dpi=220, bbox_inches="tight")
-    plt.close()
-
-    mean_table_2 = df.groupby("Income_group", as_index=False)["NumWebPurchases"].mean()
-    mean_table_2.to_csv(f"{OUTPUT_DIR}/tables/srednie_w_grupach_NumWebPurchases_Income_group.csv", index=False)
-
-
-    plt.figure(figsize=(9, 5.5))
-    plt.bar(
-        mean_table_2["Income_group"].astype(str),
-        mean_table_2["NumWebPurchases"],
-        color=PRIMARY_COLOR
-    )
-    plt.title("Średnia liczba zakupów internetowych w grupach dochodu", pad=14)
-    plt.xlabel("Grupa dochodu")
-    plt.ylabel("Średnia NumWebPurchases")
-    plt.xticks(rotation=20)
-    plt.tight_layout()
-    plt.savefig(
-        f"{OUTPUT_DIR}/plots/bar_mean_NumWebPurchases_Income_group.png",
-        dpi=220,
-        bbox_inches="tight"
-    )
-    plt.close()
+    for categorical_column in categorical_columns:
+        for numeric_column in numeric_columns:
+            plt.figure(figsize=(9, 5.5))
+            sns.boxplot(
+                data=df,
+                x=categorical_column,
+                y=numeric_column,
+                palette=COLOR_PALETTE,
+            )
+            plt.title(f"Skategoryzowany boxplot: {numeric_column} względem {categorical_column}", pad=14)
+            plt.xlabel(categorical_column)
+            plt.ylabel(numeric_column)
+            plt.tight_layout()
+            plt.savefig(
+                os.path.join(plots_dir, f"boxplot_{numeric_column}_wg_{categorical_column}.png"),
+                dpi=220,
+                bbox_inches="tight",
+            )
+            plt.close()
 
 
-    plt.figure(figsize=(9, 5.5))
-    sns.pointplot(
-        data=df,
-        x="Income_group",
-        y="NumWebPurchases",
-        color=SECONDARY_COLOR,
-        errorbar=None
-    )
-    plt.title("Wykres średnich w grupach: NumWebPurchases względem Income_group", pad=14)
-    plt.xticks(rotation=20)
-    plt.tight_layout()
-    plt.savefig(f"{OUTPUT_DIR}/plots/interaction_NumWebPurchases_Income_group.png", dpi=220, bbox_inches="tight")
-    plt.close()
+def plot_group_means(df, config, hypothesis_name):
+    _, tables_dir, plots_dir = get_paths(hypothesis_name)
+
+    target = config["target"]
+    predictors = config["predictors"]
+
+    for predictor in predictors:
+        if not pd.api.types.is_numeric_dtype(df[predictor]):
+            group_table = df.groupby(predictor)[target].mean().reset_index()
+            group_table.columns = [predictor, f"srednia_{target}"]
+
+            save_table(
+                group_table.round(3),
+                os.path.join(tables_dir, f"srednie_{target}_wg_{predictor}.csv")
+            )
+
+            plt.figure(figsize=(9, 5.5))
+            sns.barplot(data=group_table, x=predictor, y=f"srednia_{target}", palette=COLOR_PALETTE)
+            plt.title(f"Średnia {target} względem {predictor}", pad=14)
+            plt.xlabel(predictor)
+            plt.ylabel(f"Średnia {target}")
+            plt.tight_layout()
+            plt.savefig(os.path.join(plots_dir, f"srednia_{target}_wg_{predictor}.png"), dpi=220, bbox_inches="tight")
+            plt.close()
+        else:
+            groups = pd.qcut(df[predictor], q=4, duplicates="drop")
+            group_table = df.groupby(groups)[target].mean().reset_index()
+            group_table.columns = [f"grupa_{predictor}", f"srednia_{target}"]
+            group_table[f"grupa_{predictor}"] = group_table[f"grupa_{predictor}"].astype(str)
+
+            save_table(
+                group_table.round(3),
+                os.path.join(tables_dir, f"srednie_{target}_wg_grup_{predictor}.csv")
+            )
+
+            plt.figure(figsize=(10, 5.5))
+            sns.barplot(data=group_table, x=f"grupa_{predictor}", y=f"srednia_{target}", color=PRIMARY_COLOR)
+            plt.title(f"Średnia {target} w grupach zmiennej {predictor}", pad=14)
+            plt.xlabel(f"Grupa {predictor}")
+            plt.ylabel(f"Średnia {target}")
+            plt.xticks(rotation=25, ha="right")
+            plt.tight_layout()
+            plt.savefig(os.path.join(plots_dir, f"srednia_{target}_wg_grup_{predictor}.png"), dpi=220, bbox_inches="tight")
+            plt.close()
 
 
-#macierz korelacji
+def plot_correlation_matrix(df, numeric_columns, hypothesis_name):
+    _, tables_dir, plots_dir = get_paths(hypothesis_name)
 
-def correlation_matrix(df: pd.DataFrame, numeric_cols: list[str]) -> pd.DataFrame:
-    corr = df[numeric_cols].corr()
-    corr.to_csv(f"{OUTPUT_DIR}/tables/macierz_korelacji.csv")
+    corr = df[numeric_columns].corr(method="pearson")
 
-    plt.figure(figsize=(10, 8))
+    corr_table = corr.reset_index().rename(columns={"index": "zmienna"})
+    save_table(corr_table.round(3), os.path.join(tables_dir, "macierz_korelacji.csv"))
+
+    plt.figure(figsize=(9, 7))
     sns.heatmap(
         corr,
         annot=True,
         fmt=".2f",
         cmap=sns.light_palette(PRIMARY_COLOR, as_cmap=True),
         linewidths=1,
-        linecolor="white"
+        linecolor="white",
     )
-    plt.title("Macierz korelacji", pad=14)
+    plt.title(f"Macierz korelacji - {hypothesis_name}", pad=14)
     plt.tight_layout()
-    plt.savefig(f"{OUTPUT_DIR}/plots/macierz_korelacji.png", dpi=240, bbox_inches="tight")
+    plt.savefig(os.path.join(plots_dir, "macierz_korelacji.png"), dpi=220, bbox_inches="tight")
     plt.close()
 
-    return corr
 
+def plot_scatterplots(df, config, hypothesis_name):
+    _, _, plots_dir = get_paths(hypothesis_name)
 
-#diagram waznosci
+    target = config["target"]
+    predictors = config["predictors"]
+    numeric_predictors = [column for column in predictors if pd.api.types.is_numeric_dtype(df[column])]
 
-def chi_square_tests(df: pd.DataFrame) -> pd.DataFrame:
-    results = []
-
-    contingency = pd.crosstab(df["Marital_Status"], df["Response"])
-    chi2_stat, p_value, dof, _ = chi2_contingency(contingency)
-
-    results.append({
-        "zmienna_1": "Marital_Status",
-        "zmienna_2": "Response",
-        "chi2": chi2_stat,
-        "p_value": p_value,
-        "df": dof
-    })
-
-    numeric_predictors = [
-        "Income",
-        "Recency",
-        "NumCatalogPurchases",
-        "NumWebVisitsMonth",
-        "Kidhome",
-        "MntWines"
-    ]
-
-    for col in numeric_predictors:
-        binned = pd.qcut(df[col], q=4, duplicates="drop")
-        contingency = pd.crosstab(binned, df["Response"])
-        chi2_stat, p_value, dof, _ = chi2_contingency(contingency)
-
-        results.append({
-            "zmienna_1": col,
-            "zmienna_2": "Response",
-            "chi2": chi2_stat,
-            "p_value": p_value,
-            "df": dof
-        })
-
-    result_df = pd.DataFrame(results).sort_values("chi2", ascending=False)
-    result_df.to_csv(f"{OUTPUT_DIR}/tables/testy_chi2.csv", index=False)
-
-    plt.figure(figsize=(10, 6))
-    sns.barplot(
-        data=result_df,
-        x="chi2",
-        y="zmienna_1",
-        palette=COLOR_PALETTE
-    )
-    plt.title("Diagram ważności na podstawie statystyki Chi^2", pad=14)
-    plt.xlabel("Wartość statystyki Chi^2")
-    plt.ylabel("Zmienna")
-    plt.tight_layout()
-    plt.savefig(f"{OUTPUT_DIR}/plots/diagram_waznosci_chi2.png", dpi=240, bbox_inches="tight")
-    plt.close()
-
-    return result_df
-
-
-#boxplot
-
-def boxplots(df: pd.DataFrame, numeric_cols: list[str]):
-    for i, col in enumerate(numeric_cols):
-        plt.figure(figsize=(9, 5.5))
-        sns.boxplot(
-            x=df[col],
-            color=COLOR_PALETTE[i % len(COLOR_PALETTE)],
-            linewidth=1.5,
-            fliersize=5
-        )
-        plt.title(f"Wykres ramka-wąsy: {col}", pad=14)
+    for predictor in numeric_predictors:
+        plt.figure(figsize=(8, 5.5))
+        sns.scatterplot(data=df, x=predictor, y=target, color=PRIMARY_COLOR, alpha=0.6)
+        plt.title(f"Wykres rozrzutu: {target} względem {predictor}", pad=14)
+        plt.xlabel(predictor)
+        plt.ylabel(target)
         plt.tight_layout()
-        plt.savefig(f"{OUTPUT_DIR}/plots/boxplot_{col}.png", dpi=220, bbox_inches="tight")
+        plt.savefig(os.path.join(plots_dir, f"scatter_{target}_vs_{predictor}.png"), dpi=220, bbox_inches="tight")
         plt.close()
 
+        if target == "Response":
+            grouped_predictor = pd.qcut(df[predictor], q=4, duplicates="drop")
+            plot_data = df.copy()
+            plot_data[f"grupa_{predictor}"] = grouped_predictor.astype(str)
 
-def categorized_boxplots(df: pd.DataFrame, pairs: list[tuple[str, str]]):
-    for numeric_col, cat_col in pairs:
-        plt.figure(figsize=(9, 5.5))
-        sns.boxplot(
-            data=df,
-            x=cat_col,
-            y=numeric_col,
-            palette=COLOR_PALETTE,
-            linewidth=1.4
-        )
-        plt.title(f"Skategoryzowany boxplot: {numeric_col} względem {cat_col}", pad=14)
-        plt.xticks(rotation=20)
-        plt.tight_layout()
-        plt.savefig(f"{OUTPUT_DIR}/plots/boxplot_cat_{numeric_col}_{cat_col}.png", dpi=220, bbox_inches="tight")
-        plt.close()
-
-
-#normalne/odstajace
-
-def normality_and_outliers(df: pd.DataFrame, numeric_cols: list[str]) -> pd.DataFrame:
-    results = []
-    outlier_summary = []
-
-    for col in numeric_cols:
-        series = df[col].dropna()
-
-        if len(series) > 5000:
-            sample = series.sample(5000, random_state=42)
-        else:
-            sample = series
-
-        stat, p_value = shapiro(sample)
-
-        z_scores = np.abs(zscore(series))
-        outliers_count = (z_scores > 3).sum()
-
-        results.append({
-            "zmienna": col,
-            "shapiro_stat": stat,
-            "p_value": p_value,
-            "czy_normalny_przy_0_05": "tak" if p_value > 0.05 else "nie"
-        })
-
-        outlier_summary.append({
-            "zmienna": col,
-            "liczba_odstajacych_zscore_gt_3": int(outliers_count)
-        })
-
-    normality_df = pd.DataFrame(results)
-    outliers_df = pd.DataFrame(outlier_summary)
-
-    normality_df.to_csv(f"{OUTPUT_DIR}/tables/test_normalnosci.csv", index=False)
-    outliers_df.to_csv(f"{OUTPUT_DIR}/tables/wartosci_odstajace.csv", index=False)
-
-    return normality_df.merge(outliers_df, on="zmienna")
-
-
-#wykres rozrzutu
-
-def scatter_plots(df: pd.DataFrame, pairs: list[tuple[str, str]], group_var: str):
-    for i, (x_col, y_col) in enumerate(pairs):
-        plt.figure(figsize=(9, 5.5))
-        sns.scatterplot(
-            data=df,
-            x=x_col,
-            y=y_col,
-            color=COLOR_PALETTE[i % len(COLOR_PALETTE)],
-            s=55,
-            alpha=0.75
-        )
-        plt.title(f"Wykres rozrzutu: {y_col} względem {x_col}", pad=14)
-        plt.tight_layout()
-        plt.savefig(f"{OUTPUT_DIR}/plots/scatter_{x_col}_{y_col}.png", dpi=240, bbox_inches="tight")
-        plt.close()
-
-        if group_var in df.columns:
-            plt.figure(figsize=(9, 5.5))
-            sns.scatterplot(
-                data=df,
-                x=x_col,
-                y=y_col,
-                hue=group_var,
-                palette=COLOR_PALETTE,
-                s=55,
-                alpha=0.75
+            plt.figure(figsize=(10, 5.5))
+            sns.histplot(
+                data=plot_data,
+                x=predictor,
+                hue="Response",
+                bins=30,
+                multiple="stack",
+                palette=COLOR_PALETTE[:2],
             )
-            plt.title(f"Wykres rozrzutu: {y_col} względem {x_col}, grupowanie: {group_var}", pad=14)
+            plt.title(f"Skategoryzowany histogram: {predictor} względem Response", pad=14)
+            plt.xlabel(predictor)
+            plt.ylabel("Liczebność")
             plt.tight_layout()
             plt.savefig(
-                f"{OUTPUT_DIR}/plots/scatter_cat_{x_col}_{y_col}_{group_var}.png",
-                dpi=240,
-                bbox_inches="tight"
+                os.path.join(plots_dir, f"histogram_{predictor}_wg_Response.png"),
+                dpi=220,
+                bbox_inches="tight",
             )
             plt.close()
 
 
+def run_hypothesis_analysis(df, hypothesis_name, config):
+    print(f"\n{hypothesis_name}")
+
+    _, tables_dir, _ = get_paths(hypothesis_name)
+
+    columns = get_hypothesis_columns(config)
+    data = df[columns].dropna().copy()
+
+    numeric_columns = get_numeric_columns(data, columns)
+    categorical_columns = get_categorical_columns(data, columns)
+
+    stats = descriptive_statistics(data, numeric_columns)
+    save_table(stats, os.path.join(tables_dir, "statystyki_opisowe.csv"))
+
+    for categorical_column in categorical_columns:
+        freq = frequency_table(data, categorical_column)
+        save_table(freq, os.path.join(tables_dir, f"licznosci_{categorical_column}.csv"))
+
+    if hypothesis_name == "hipoteza_3":
+        response_table = response_report_for_hypothesis_3(data)
+        save_table(response_table, os.path.join(tables_dir, "charakterystyka_klientow_wedlug_Response.csv"))
+
+    corr_table = correlation_table(data, config)
+    save_table(corr_table, os.path.join(tables_dir, "korelacje_istotne.csv"))
+
+    normality_table = normality_and_outliers(data, numeric_columns)
+    save_table(normality_table, os.path.join(tables_dir, "test_normalnosci_i_odstajace.csv"))
+
+    chi_square_importance(data, config, hypothesis_name)
+
+    plot_histograms(data, numeric_columns, hypothesis_name)
+    plot_boxplots(data, numeric_columns, hypothesis_name)
+    plot_categorized_boxplots(data, config, hypothesis_name)
+    plot_group_means(data, config, hypothesis_name)
+    plot_correlation_matrix(data, numeric_columns, hypothesis_name)
+    plot_scatterplots(data, config, hypothesis_name)
+
+
 def main():
+    create_directories()
     set_plot_style()
 
-    df = load_data(FILE_PATH)
+    df = load_data()
     df = clean_data(df)
 
-    print("Dane po czyszczeniu:", df.shape)
+    for hypothesis_name, config in HYPOTHESES.items():
+        run_hypothesis_analysis(df, hypothesis_name, config)
 
-    stats_df = descriptive_stats(df, NUMERIC_VARS)
-    print("\nStatystyki opisowe:")
-    print(stats_df)
-
-    freq_tables = frequency_tables(df, CATEGORICAL_VARS)
-    for col, table in freq_tables.items():
-        print(f"\nTabela liczności dla {col}:")
-        print(table)
-
-    multi_table = multivariate_table(df)
-    print("\nTabela wielodzielcza:")
-    print(multi_table)
-
-    plot_histograms(df, NUMERIC_VARS)
-    categorized_histograms(df)
-    interaction_plots(df)
-
-    corr_df = correlation_matrix(df, NUMERIC_VARS)
-    print("\nMacierz korelacji:")
-    print(corr_df)
-
-    chi2_df = chi_square_tests(df)
-    print("\nTesty Chi^2:")
-    print(chi2_df)
-
-    boxplots(df, NUMERIC_VARS)
-    categorized_boxplots(df, BOXPLOT_CATEGORIZED_PAIRS)
-
-    normality_df = normality_and_outliers(df, NUMERIC_VARS)
-    print("\nNormalność i odstające:")
-    print(normality_df)
-
-    scatter_plots(df, SCATTER_PAIRS, SCATTER_GROUP_VAR)
-
-    print(f"\nWyniki zapisano w folderze: {OUTPUT_DIR}")
+    print(f"\nWyniki zapisano w: {OUTPUT_DIR}")
 
 
 if __name__ == "__main__":
